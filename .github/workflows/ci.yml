@@ -8,6 +8,11 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write # Permite dar push em commits
+  checks: write # Necessário para o Publish JUnit Report
+  pull-requests: write # Se o report de testes comentar no PR
+
 jobs:
   test-and-lint:
     runs-on: ubuntu-latest
