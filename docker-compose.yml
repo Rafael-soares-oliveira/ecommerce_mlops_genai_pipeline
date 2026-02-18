@@ -1,0 +1,134 @@
+services:
+  # --- DATA LAYER ---
+  postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: thelook_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql # Garantir acesso (precaução)
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro # Read Only
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - thelook-net
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: thelook_pgadmin
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "${PGADMIN_PORT}:80"
+    networks:
+      - thelook-net
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-service
+    restart: unless-stopped
+    volumes:
+      - ollama_storage:/root/.ollama
+    networks:
+      - thelook-net
+    environment:
+      - OLLAMA_KEEP_ALIVE=5m
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+      args:
+        EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME}
+    container_name: streamlit-ui
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - duckdb_storage:/app/data/duckdb
+      - sentence_transformers_cache:/app/model_cache
+      - ./src:/app/src
+      - ./conf:/app/conf
+    ports:
+      - "${STREAMLIT_PORT}:8501"
+    networks:
+      - thelook-net
+    command: ["uv", "run", "streamlit", "run", "src/app.py"]
+
+  kedro-viz:
+    image: thelook-app-stack
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: kedro-viz-server
+    restart: always
+    volumes:
+      - kedro_experiments_data:/app/.kedro
+      - ./src:/app/src
+      - ./conf:/app/conf
+    ports:
+      - "${KEDRO_PORT}:4141"
+    networks:
+      - thelook-net
+    command: uv run kedro viz run --host 0.0.0.0 --port 4141 --include-hooks --no-browser
+
+  kedro-worker:
+    image: thelook-app-stack
+    container_name: kedro-job-runner
+    profiles:
+      - etl
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      HF_HOME: /app/model_cache
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - sentence_transformers_cache:/app/model_cache
+      - kedro_experiments_data:/app/.kedro
+      - ./src:/app/src
+      - ./conf:/app/conf
+      - ./data/01_raw:/app/data/01_raw:ro
+      - ./sql/raw_data:/app/sql/raw_data:ro
+      - ./sql/embeddings:/app/sql/embeddings:ro
+    networks:
+      - thelook-net
+    command: ["uv", "run", "kedro", "run"]
+
+volumes:
+  pg_data:
+  pgadmin_data:
+  ollama_storage:
+  sentence_transformers_cache:
+  duckdb_storage:
+  kedro_experiments_data:
+
+networks:
+  thelook-net:
+    driver: bridge

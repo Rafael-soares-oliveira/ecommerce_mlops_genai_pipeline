@@ -1,0 +1,175 @@
+[build-system]
+requires = [
+    "hatchling",
+]
+build-backend = "hatchling.build"
+
+[project]
+requires-python = ">=3.13"
+name = "thelook_ecommerce_analysis"
+description = "Pipeline MLOps de E-commerce com Kedro, SLM e RAG."
+readme = "README.md"
+authors = [
+    { name = "Rafael" }
+]
+dynamic = [
+    "version",
+]
+dependencies = [
+    "adbc-driver-postgresql>=1.10.0",
+    "connectorx>=0.4.5",
+    "ibis-framework[duckdb,postgres]>=11.0.0",
+    "kedro>=1.2.0",
+    "kedro-datasets>=9.1.1",
+    "kedro-viz>=12.3.0",
+    "pandas>=2.3.3",
+    "pandera>=0.29.0",
+    "pgpq>=0.11.0",
+    "pgvector>=0.4.2",
+    "polars>=1.38.1",
+    "psutil>=7.2.2",
+    "psycopg[binary]>=3.3.2",
+    "pyarrow>=23.0.0",
+    "python-dotenv>=1.2.1",
+    "sentence-transformers>=5.2.2",
+    "sqlalchemy>=2.0.46",
+    "streamlit>=1.54.0",
+    "torch>=2.10.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+    "jupyter>=1.1.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "pytest-mock>=3.15.1",
+    "pytest-xdist>=3.8.0",
+    "ruff>=0.15.0",
+    "ty>=0.0.15",
+]
+
+[project.scripts]
+thelook-ecommerce-analysis = "thelook_ecommerce_analysis.__main__:main"
+
+[project.entry-points."kedro.hooks"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/thelook_ecommerce_analysis"]
+
+[tool.hatch.version]
+path = "src/thelook_ecommerce_analysis/__init__.py"
+
+[tool.kedro]
+package_name = "thelook_ecommerce_analysis"
+project_name = "thelook_ecommerce_analysis"
+kedro_init_version = "1.1.1"
+tools = "['Data Structure']"
+example_pipeline = "False"
+source_dir = "src"
+
+[tool.ruff]
+extend-include = ["*.ipynb"]
+
+[tool.ruff.format]
+docstring-code-format = true
+quote-style = "double" # Aspas duplas
+indent-style = "space" # Indentação por espaços
+skip-magic-trailing-comma = false # Mantém vírgular finais automáticas
+line-ending = "auto"
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = true # Ignora type hint para *args e **kwargs
+suppress-none-returning = true # Não obriga que a saída seja 'return' None
+
+[tool.ruff.lint]
+select = [
+    "NPY", # Numpy-specific rules: Evita funções obsoletas e garante o uso correto de tipos Numpy
+    "PD", # pandas-vet: Melhores práticas para Pandas
+    "F", # Pyflakes: Detecata variáveis não utilizadas e erros de lógica básica
+    "W", # pycodestyle warnings
+    "E", # pycodestyle errors
+    "I", # isort: Organiza imports
+    "UP", # pyupgrade: Mantém a sintaxe do Python moderna
+    "PL", # Pylint: Identifica funções com argumentos demais
+    "T201", # flake8-print: Proíbe uso de print() ao invés de logging
+    "S", # flake8-bandit: Verifica falhas de segurança
+    "B", # flake8-bugbear (bugs comuns)
+    "ANN", # flake8-annotations: Garante a tipagem dos agumentos das funções
+    "TCH", # flake8-type-checking: Organiza imports que servem apenas para tipos
+    "PYI", # flake8-pyi: Regras específicas para arquivos de interface de tipos .pyi
+    "N" # Verifica se os nomes das variáveis, funções e classes seguem PEP 8
+]
+ignore = [
+"E501",
+"ANN002", # Permite não fornece type hint para *args
+"ANN003", # Permite não fornecer type hint para **kwargs
+"ANN401", # Permite utilizar typing.Any
+]
+
+[tool.ruff.lint.pep8-naming]
+ignore-names = ["X", "y", "df"] # Ignora regra de naming para variáveis comuns em ML
+classmethod-decorators = ["pydantic.validator", "declared_atrr"] #
+
+[tool.ruff.lint.per-file-ignores]
+"*.ipynb" = ["T201"] # Permite print em notebooks
+"tests/*" = ["S101", "PLR2004"] # Permite assert nos testes | Permite passar magic value ao invés de variáveis
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+addopts = [
+    "--cov=src/thelook_ecommerce_analysis", # Irá cobrir apenas a pasta src
+    "--cov-report=term-missing", # Lista quais linhas exatas não foram testadas
+    "--cov-report=xml", # Gera relatório em XML
+    "--cov-report=html", # Gera relatório em HTML
+    "--junitxml=junit/test-results.xml", # Exporta para XML, uso no GitHub Actions
+    "-ra", # Mostra um resumo ao final
+    "--verbose", # Aumenta o detalhamento da saída
+    "--strict-markers", # Retorna erro se tentar usar decorator não registrado
+    "--strict-config", # Retorna erro se houve configuração inválida
+    "-n=auto", # Execução paralela
+]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*", "*Test"]
+python_functions = ["test_*"]
+filterwarnings = [
+    "ignore::DeprecationWarning", # Silencia avisos de funcionalidades que serão removidas
+    "ignore::UserWarning", # Silencia avisos da biblioteca
+    "default" # Garante que qualquer outro aviso seja exibido uma vez por local de emissão
+]
+
+[tool.coverage.run]
+source = ["src/thelook_ecommerce_analysis"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/setup.py",
+    "*/conftest.py",
+    "*/pipeline_registry.py",
+    "*/__main__.py",
+    "*/__init__.py"
+]
+
+[tool.coverage.report]
+fail_under = 0 # Mudar posteriormente para 80%
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\b:",
+    "@(abc\\.)?abstractmethod"
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+title = "Coverage Report - Ecommerce MLOps & GenAI Pipeline"

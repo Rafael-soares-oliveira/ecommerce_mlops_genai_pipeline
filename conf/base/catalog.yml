@@ -1,0 +1,38 @@
+# ===============================================================
+# 1. Dados Brutos vindo de arquivo .parquet (mudar se necessário)
+# ===============================================================
+"raw_{table}":
+  type: ibis.FileDataset
+  filepath: data/01_raw/{table}.parquet
+  file_format: parquet
+  connection:
+    backend: duckdb
+  table_name: "{table}"
+  metadata:
+    kedro-viz:
+      layer: Raw
+
+# ===============================================================
+# 2. Dados Primários (Carga no Banco de Dados)
+# ===============================================================
+
+# YAML ANCHOR & ALIASES
+_postgres_upsert_base: &postgres_upsert_base
+  type: thelook_ecommerce_analysis.datasets.ibis_upsert_dataset.IbisUpsertDataset
+  credentials: postgres_ibis
+  connection:
+    backend: postgresql
+    schema: raw_data
+
+# Apenas para consulta de Watermark
+primary_consult_inventory_items:
+  <<: *postgres_upsert_base
+  table_name: inventory_items
+
+"primary_{table_name}":
+  <<: *postgres_upsert_base
+  table_name: "{table_name}"
+  save_args:
+    materialized: table
+    mode: upsert
+    global_config: ${globals:tables}

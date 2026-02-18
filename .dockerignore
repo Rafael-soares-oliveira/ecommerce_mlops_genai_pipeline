@@ -1,0 +1,29 @@
+# --- Data e Logs ---
+data/
+logs/*
+!logs/.gitkeep
+.kedro/
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# --- Configurações Locais e Segredos ---
+conf/local/
+.env
+
+# --- Arquivos de Desenvolvimento e Testes ---
+tests/
+notebooks/
+docs/
+.git/
+.github/
+.venv
+
+# --- Scripts de Infraestrutura ---
+*.sh
+!run_job.sh
+docker-compose.yml
+Dockerfile
+Dockerfile.app
+
+requirements.txt
