@@ -31,10 +31,8 @@ dependencies = [
     "psycopg[binary]>=3.3.2",
     "pyarrow>=23.0.0",
     "python-dotenv>=1.2.1",
-    "sentence-transformers>=5.2.2",
     "sqlalchemy>=2.0.46",
     "streamlit>=1.54.0",
-    "torch>=2.10.0",
 ]
 
 [dependency-groups]
@@ -47,6 +45,10 @@ dev = [
     "pytest-xdist>=3.8.0",
     "ruff>=0.15.0",
     "ty>=0.0.15",
+]
+heavy = [
+    "torch>=2.10.0",
+    "sentence-transformers>=5.2.2",
 ]
 
 [project.scripts]

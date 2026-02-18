@@ -30,7 +30,7 @@ ARG UV_CONCURRENT_BUILDS=4
 # Instala as depedências e pré-baixa o modelo no build
 # --no-install-project impede que ele tente ler o código agora
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+    uv sync --frozen --no-dev --group heavy --no-install-project
 
 # --- CAMADA 2: Cache do Modelo (O Segredo está aqui) ---
 # Recebe o nome do modelo como argumento de build
@@ -46,6 +46,6 @@ COPY . .
 
 # Instala o projeto
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev --group heavy
 
 CMD ["uv", "run", "streamlit", "run", "src/app.py"]
