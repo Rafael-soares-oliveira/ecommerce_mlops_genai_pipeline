@@ -4,9 +4,14 @@
 [![Powered by Kedro](https://img.shields.io/badge/powered_by-kedro-ffc900?logo=kedro)](https://kedro.org)
 [![Python](https://img.shields.io/badge/Python-3.13%2B-blue?logo=Python)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/Docker-blue?logo=Docker)](https://www.docker.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-docker-green?logo=Postgresql)](https://www.postgresql.org/)
-[![Ollama](https://img.shields.io/badge/Ollama-local-green?logo=Ollama)](https://ollama.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Docker-green?logo=Postgresql)](https://www.postgresql.org/)
+[![Ollama](https://img.shields.io/badge/Ollama-Docker-green?logo=Ollama)](https://ollama.com/)
+
 [![Ollama](https://img.shields.io/badge/theLook_eCommerce-dataset-blue?logo=GoogleCloud)](https://console.cloud.google.com/marketplace/product/bigquery-public-data/thelook-ecommerce?project=bigquery-484420)
+
+
+[![CI](https://github.com/Rafael-soares-oliveira/ecommerce_mlops_genai_pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/Rafael-soares-oliveira/ecommerce_mlops_genai_pipeline/actions/workflows/ci.yml)
+![Coverage](coverage.svg)
 
 <br>
 
