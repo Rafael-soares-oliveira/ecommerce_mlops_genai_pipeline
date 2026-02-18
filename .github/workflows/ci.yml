@@ -22,7 +22,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --group dev --no-group heavy
 
       - name: Lint with Ruff
         run: uv run ruff check .
@@ -50,7 +50,8 @@ jobs:
         run: uvx coverage-badge -o coverage.svg -f
 
       - name: Commit Badge
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: atualiza badge de cobertura"
+          commit_message: "chore: atualiza badge de cobertura [skip ci]"
           file_pattern: coverage.svg
