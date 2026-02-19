@@ -4,6 +4,7 @@ from thelook_ecommerce_analysis.utils.partial_func import create_node_func
 
 from .nodes import (
     extract_distribution_centers,
+    extract_events,
     extract_inventory_items,
     extract_order_items,
     extract_orders,
@@ -107,6 +108,16 @@ def create_pipeline(**kwargs) -> Pipeline:
                 outputs="primary_order_items",
                 name="process_order_items_table_node",
                 tags=["raw", "order_items"],
+            ),
+            Node(
+                func=create_node_func(extract_events, schema_rules=users_schema),
+                inputs={
+                    "events": "raw_events",
+                    "columns": "params:tables.events.columns",
+                },
+                outputs="primary_events",
+                name="process_events_table_node",
+                tags=["raw", "events"],
             ),
         ],
         namespace="data_processing",

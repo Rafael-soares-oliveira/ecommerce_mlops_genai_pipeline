@@ -17,3 +17,8 @@ CREATE TABLE IF NOT EXISTS embeddings.products_embeddings (
         REFERENCES raw_data.products (id)
         ON DELETE CASCADE
 );
+
+-- Comentários para products_embeddings
+COMMENT ON TABLE embeddings.products_embeddings IS 'Tabela de busca semântica para produtos usando pgvector. Use para encontrar produtos similares por contexto textual.';
+COMMENT ON COLUMN embeddings.products_embeddings.chunk_text IS 'Texto original que gerou o vetor. Retorne esta coluna no SELECT.';
+COMMENT ON COLUMN embeddings.products_embeddings.embedding IS 'Vetor (384 dim). OBRIGATÓRIO usar operador <=> com placeholder para ordenação de similaridade.';

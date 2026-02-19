@@ -150,3 +150,31 @@ order_items_schema = {
     },
     "agg": {"id_duplicated": lambda t: t.count() - t["id"].nunique()},
 }
+
+
+events_schema = {
+    "row": {
+        # Campos Not Null obrigatórios
+        "id_missing": lambda t: t["id"].isnull(),
+        "session_missing": lambda t: t["session_id"].isnull(),
+        "created_missing": lambda t: t["created_at"].isnull(),
+        # Integridade do RAG: garante que o LLM não filtre categorias inexistentes
+        "event_type_invalid": lambda t: (
+            t["event_type"].notnull()
+            & ~t["event_type"].isin(
+                ["product", "department", "cart", "purchase", "cancel", "home"]
+            )
+        ),
+        # Integridade de navegação
+        "seq_invalid": lambda t: (
+            t["sequence_number"].notnull() & (t["sequence_number"] < 1)
+        ),
+    },
+    "agg": {
+        # Valida a unicidade da PK Composta (id, created_at)
+        "pk_duplicated": lambda t: (
+            t.count()
+            - (t["id"].cast("string") + "_" + t["created_at"].cast("string")).nunique()
+        )
+    },
+}

@@ -92,3 +92,25 @@ tables:
       - id
     exclude_from_update:
       - created_at
+
+events:
+  columns:
+    - id
+    - user_id
+    - sequence_number
+    - session_id
+    - created_at
+    - ip_address
+    - city
+    - state
+    - postal_code
+    - browser
+    - traffic_source
+    - uri
+    - event_type
+    - visitor_type
+    - extracted_product_id
+    - extracted_page_type
+  index_elements:
+    - id
+    - created_at

@@ -13,6 +13,6 @@ RUN apt-get update && apt-get install -y \
 
 # Configura o loader e roda o tune de forma automática (prevendo 2GB de RAM, ajuste se necessário)
 RUN echo "shared_preload_libraries = 'timescaledb,pg_stat_statements,vector'" >> /usr/share/postgresql/postgresql.conf.sample \
-    && timescaledb-tune --quiet --yes --memory=4GB --cpus=4 --conf-path=/usr/share/postgresql/postgresql.conf.sample
+    && timescaledb-tune --quiet --yes --memory=2GB --cpus=4 --conf-path=/usr/share/postgresql/postgresql.conf.sample
 
 USER postgres

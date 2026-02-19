@@ -8,6 +8,7 @@ from pytest_mock import MockerFixture
 from thelook_ecommerce_analysis.pipelines.data_processing.nodes import (
     _validate_ibis_table,
     extract_distribution_centers,
+    extract_events,
     extract_inventory_items,
     extract_order_items,
     extract_orders,
@@ -16,6 +17,7 @@ from thelook_ecommerce_analysis.pipelines.data_processing.nodes import (
 )
 from thelook_ecommerce_analysis.pipelines.data_processing.schema_rules import (
     distribution_centers_schema,
+    events_schema,
     inventory_items_schema,
     order_items_schema,
     orders_schema,
@@ -580,3 +582,34 @@ class TestDataProcessingNodes:
                 order_items_schema,
                 list(items_df.columns),
             )
+
+    def test_extract_events_happy_path(self) -> None:
+        """Testa a extração e validação do schema básico da tabela events."""
+
+        df = pd.DataFrame(
+            {
+                "id": [1],
+                "user_id": [10],
+                "sequence_number": [1],
+                "session_id": ["abc-123"],
+                "created_at": pd.to_datetime(["2023-01-01"], utc=True),
+                "city": ["São Paulo"],
+                "state": ["SP"],
+                "browser": ["Chrome"],
+                "traffic_source": ["Organic"],
+                "event_type": ["product"],
+                "extracted_product_id": [100],
+                "extracted_page_type": ["product_page"],
+            }
+        )
+        table = ibis.memtable(df)
+        cols = list(df.columns)
+
+        res = extract_events(table, schema_rules=events_schema, columns=cols)
+
+        assert res.count().to_pandas() == 1, (
+            "Deveria retornar um DataFrame com 1 registro"
+        )
+        assert "visitor_type" in res.columns, (
+            "Deveria conter a coluna materializada 'visitor_type'"
+        )

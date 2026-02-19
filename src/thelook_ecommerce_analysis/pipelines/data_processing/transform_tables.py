@@ -145,3 +145,23 @@ def transform_order_items(oi: ir.Table) -> ir.Table:
             df.delivered_at, df.returned_at
         )
     )
+
+
+def transform_events(events: ir.Table) -> ir.Table:
+    """Aplica transformações e enriquece dados para simplificar queries do RAG."""
+    return events.mutate(
+        id=events.id.cast("int32"),
+        user_id=events.user_id.cast("int32"),
+        sequence_number=events.sequence_number.cast("int32"),
+        created_at=events.created_at.cast("timestamp"),
+        session_id=events.session_id.fill_null("Unknown"),
+        city=events.city.fill_null("Unknown"),
+        state=events.state.fill_null("Unknown"),
+        browser=events.browser.fill_null("Unknown"),
+        traffic_source=events.traffic_source.fill_null("Unknown"),
+        event_type=events.event_type.fill_null("Unknown"),
+        # Materializa status do visitante para evitar lógicas de NULL no RAG
+        visitor_type=events.user_id.isnull().ifelse("Guest", "Registered"),
+        extracted_product_id=events.extracted_product_id.cast("int32"),
+        extracted_page_type=events.extracted_page_type.fill_null("Unknown"),
+    )

@@ -6,113 +6,121 @@
 [![Docker](https://img.shields.io/badge/Docker-blue?logo=Docker)](https://www.docker.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Docker-green?logo=Postgresql)](https://www.postgresql.org/)
 [![Ollama](https://img.shields.io/badge/Ollama-Docker-green?logo=Ollama)](https://ollama.com/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-Docker-green?logo=FastAPI)](https://fastapi.tiangolo.com/)
 [![Streamlit UI](https://img.shields.io/badge/Streamlit-Docker-green?logo=Streamlit)](https://docs.streamlit.io/)
 
 [![Ollama](https://img.shields.io/badge/theLook_eCommerce-dataset-blue?logo=GoogleCloud)](https://console.cloud.google.com/marketplace/product/bigquery-public-data/thelook-ecommerce?project=bigquery-484420)
 
 
 [![CI](https://github.com/Rafael-soares-oliveira/ecommerce_mlops_genai_pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/Rafael-soares-oliveira/ecommerce_mlops_genai_pipeline/actions/workflows/ci.yml)
-![Coverage](coverage.svg)
+![Coverage](./coverage.svg)
 
 <br>
 
 ## 1. Objetivo do Projeto
 
-O objetivo primário desta arquitetura é fornecer uma plataforma analítica end-to-end altamente eficiente, projetada para operar em cenários de baixo recurso e com baixo volume de dados, mas com máxima performance, robustez e precisão.
+O objetivo primário desta arquitetura é fornecer uma plataforma analítica end-to-end altamente eficiente, projetada para operar em cenários de baixo recurso e com baixo/médio volume de dados, mas com máxima performance, robustez e precisão.
 
-O sistema orquestra a ingestão e transformação de arquivos Parquet em tabelas relacionais de métricas de negócio, vetoriza metadados para busca semântica e disponibiliza uma interface interativa via Streamlit. Através de um Agente RAG (Retrieval-Augmented Generation), o usuário pode fazer perguntas em linguagem natural, que são convertidas em consultas SQL validadas. A comunicação entre a interface gráfica e o motor RAG/PostgreSQL ocorre via API gRPC, retornando respostas e visualizações dinâmicas com baixa latência e sem intervenção técnica.
+O sistema orquestra a ingestão e transformação de arquivos Parquet em tabelas relacionais de métricas de negócio, vetoriza metadados para busca semântica e disponibiliza uma interface interativa via Streamlit. Através de um Agente RAG (Retrieval-Augmented Generation), o usuário pode fazer perguntas em linguagem natural, que são convertidas em consultas SQL validadas. A orquestração da inteligência e a conexão com o banco de dados ocorrem de forma nativa e persistente na própria camada de interface (Streamlit), garantindo processamento com Zero-Copy via Apache Arrow, eliminando overheads de rede e serialização complexa.
 
 <br>
 
 ## 2. Arquitetura do Sistema
 
-O fluxo de dados abaixo descreve a topologia dos containers Docker e o ciclo de vida dos dados, divididos entre o processamento em Batch (ETL) e a Inferência em Tempo Real (RAG e UI Interativa).
+O fluxo de dados abaixo descreve a topologia dos containers Docker e o ciclo de vida dos dados, divididos entre o processamento em Batch (ETL) e a Inferência em Tempo Real (RAG e UI Interativa Unificada).
 
 ```mermaid
 graph LR
-    %% Estilização
-    classDef infra fill:#2d3436,stroke:#dfe6e9,color:#fff
-    classDef kedro fill:#6c5ce7,stroke:#a29bfe,color:#fff
-    classDef db fill:#00b894,stroke:#55efc4,color:#fff
-    classDef rag fill:#e17055,stroke:#fab1a0,color:#fff
-    classDef api fill:#0984e3,stroke:#74b9ff,color:#fff
-    classDef ui fill:#d63031,stroke:#ff7675,color:#fff
-    classDef viz fill:#fdcb6e,stroke:#e17055,color:#000
-    classDef cron fill:#b2bec3,stroke:#636e72,color:#000
+    %% Estilização
+    classDef infra fill:#2d3436,stroke:#dfe6e9,color:#fff
+    classDef kedro fill:#6c5ce7,stroke:#a29bfe,color:#fff
+    classDef db fill:#00b894,stroke:#55efc4,color:#fff
+    classDef rag fill:#e17055,stroke:#fab1a0,color:#fff
+    classDef ui fill:#d63031,stroke:#ff7675,color:#fff
+    classDef viz fill:#fdcb6e,stroke:#e17055,color:#000
+    classDef cron fill:#b2bec3,stroke:#636e72,color:#000
 
-    subgraph Docker_Host ["Docker Host Infrastructure (Auto-detect GPU)"]
-        direction LR
+    subgraph Docker_Host ["Docker Host"]
+        direction LR
+        
+        CRON(("⏰ Cron")):::cron
 
-        CRON(("⏰ Cron")):::cron
+        subgraph UI_Container ["💻 Streamlit UI (Unificado)"]
+            direction TB
+            INPUT[/Pergunta do Usuário/]:::ui
+            S_TRANS["🧠 Sentence-Transformers<br/>(Cache Local)"]:::rag
+            ROUTER{{"Lógica RAG &<br/>Text-to-SQL"}}:::rag
+            IBIS{"Ibis<br/>(Validador & Arrow)"}:::rag
+            DASH["📊 Dashboard Dinâmico"]:::ui
+        end
 
-        subgraph Kedro_Group ["Data Eng (Efêmero)"]
-            K_WORKER["⚙️ Kedro Worker <br/> (Ibis + DuckDB)"]:::kedro
-            S_TRANS["🧠 Sentence-Transformers"]:::kedro
-        end
-        
-        subgraph Kedro_Viz ["Data Lineage"]
-            K_VIZ["🔍 Kedro Viz"]:::viz
-        end
+        subgraph RAG_Engine ["🧠 Ollama"]
+            LLM["DeepSeek-r1:1.5b"]:::rag
+        end
 
-        subgraph Postgres_Container ["🗄️ PostgreSQL 18 (Tuned)"]
-            PG_ALL[("Schemas:<br/>raw_data<br/>metrics<br/>embeddings")]:::db
-        end
+        subgraph Postgres_Container ["🗄️ PostgreSQL 18"]
+            PG_ALL[("Schemas:<br/>raw_data<br/>metrics<br/>embeddings")]:::db
+        end
 
-        subgraph API_Layer ["⚡ API Layer"]
-            FASTAPI["FastAPI (gRPC)"]:::api
-        end
+        subgraph Kedro_Group ["⚙️ Profile: ETL (Efêmero)"]
+            K_WORKER["Kedro Worker"]:::kedro
+        end
 
-        subgraph RAG_Engine ["🧠 Agente RAG (Ollama GPU)"]
-            ROUTER{{"Roteador & <br/> Text-to-SQL"}}:::rag
-            VALIDATOR{"Validador<br/> (Loop)"}:::rag
-        end
+        subgraph Kedro_Viz ["🔍 Profile: Debug"]
+            K_VIZ["Kedro Viz"]:::viz
+        end
+    end
 
-        subgraph UI_Container ["💻 Streamlit UI"]
-            INPUT[/Pergunta do Usuário/]:::ui
-            DASH["📊 Dashboard Dinâmico"]:::ui
-        end
-    end
+    %% Fluxos ETL (Batch)
+    CRON -. "Dispara" .-> K_WORKER
+    K_WORKER -- "Processa e Vetoriza" --> PG_ALL
+    K_WORKER -. "Lê Metadata" .-> K_VIZ
 
-    %% Fluxos ETL (Batch)
-    CRON -. "Dispara" .-> K_WORKER
-    K_WORKER -- "Upsert/Calcula" --> PG_ALL
-    K_WORKER --> S_TRANS
-    S_TRANS -- "Vetoriza (pgvector)" --> PG_ALL
-    K_WORKER -- "Metadata" --> K_VIZ
-
-    %% Fluxos RAG & UI (Real-time)
-    INPUT -- "Requisição RAG" --> FASTAPI
-    FASTAPI -- "Comunicação Interna" --> ROUTER
-    ROUTER -- "Busca Contexto/Vetores" --> PG_ALL
-    ROUTER -- "Gera SQL" --> VALIDATOR
-    VALIDATOR -- "Valida Sintaxe/Esquema" --> PG_ALL
-    VALIDATOR -. "Falhou? Refaz SQL" .-> ROUTER
-    VALIDATOR -- "Resposta Final" --> FASTAPI
-    FASTAPI -- "DF + Gráfico" --> DASH
+    %% Fluxos RAG & UI (Real-time)
+    INPUT --> S_TRANS
+    S_TRANS -- "Busca Similaridade" --> PG_ALL
+    S_TRANS --> ROUTER
+    ROUTER -- "Envia Contexto e Pede SQL" --> LLM
+    LLM -- "Retorna SQL" --> ROUTER
+    ROUTER --> IBIS
+    IBIS -- "Executa Query" --> PG_ALL
+    PG_ALL -- "Retorna PyArrow" --> IBIS
+    IBIS --> DASH
 ```
+
 
 ### 2.1. Detalhamento dos Componentes
 
 #### Infraestrutura e Pipeline Batch (ETL)
-* ⏰ Cron: Agendador local responsável por disparar o script de orquestração (`run_job.sh`) em janelas de tempo pré-definidas para ingestão incremental.
-* ⚙️ Kedro Worker (Ibis + DuckDB): Container efêmero que encapsula a lógica de extração e transformação. Utiliza a engine do DuckDB via Ibis para processar os arquivos Parquet de forma vetorizada, mitigando o alto consumo de RAM característico do Pandas.
-* 🧠 Sentence-Transfomers: Nó do pipeline responsável por ler o dicionário de dados e metadados estruturados, convertendo-os em representações vetoriais (embeddings)
+* ⏰ **Cron**: Agendador local responsável por disparar o script de orquestração (`run_job.sh`) em janelas de tempo pré-definidas para ingestão incremental.
+* ⚙️ **Kedro Worker (Ibis + DuckDB)**: Container efêmero que encapsula a lógica de extração e transformação. Utiliza a engine do DuckDB via Ibis para processar os arquivos Parquet de forma vetorizada, mitigando o alto consumo de RAM. Após a execução, o container é encerrado, liberando recursos do Host.
+* 🧠 **Sentence-Transfomers**: Etapa do pipeline responsável por ler o dicionário de dados e metadados estruturados, convertendo-os em representações vetoriais (embeddings) para carga no banco.
+* 🔍 **Kedro Viz**: Serviço de documentação visual sob demanda. Lê os metadados gerados pelo Kedro Worker para exibir o grafo de dependências e a linhagem dos dados (*Data Lineage*). Só consome recursos quanto ativado manualmente.
+
+#### Camada de Persistência
+* 🗄️ **PostgreSQL 18 (Tuned)**: Banco de dados relacional e vetorial tunado para alta performance analítica. Segmentado logicamente em schema (`raw_data`, `metrics`, `embeddings`), utiliza a extensão `pgvector` para buscas semânticas.
+
+#### Motor RAG e Inferência (Tempo Real)
+* 💻 **Streamlit UI (Motor Unificado)**: Ponto central de contato e orquestração.
+	* **Interface e Dashboard**: Captura a pergunta em linguagem natural e renderiza os DataFrames e gráficos dinâmicos.
+	* **Sentence-Transformers (Real-time)**: Gera o *embedding* da pergunta do usuário localmente (via CPU) para consulta ao banco.
+	* **Roteador & Text-to-SQL**: Lógica embutida no backend do Streamlit que envia o contexto (esquema do banco recuperado) para o motor SLM e recebe a consulta SQL estruturada.
+	* **Ibis (Executor e Validador)**: Mantém uma conexão persistente (via `@st.cache_resource`) com o PostgreSQL. Executa o SQL gerado pelo RAG, valida a sintaxe e retorna os dados nativamente no formato **Apache Arrow**, evitando custos de conversão JSON.
+* 🧠 **Ollama (Motor de Inferência SLM)**: Serviço isolado que hospeda o modelo na GPU. Atua estritamente como um gerador de texto a partir dos prompts estruturados enviados pelo Streamlit.
+
 
 <br>
 
 ## 3. Escolhas Tecnológicas e Justificativas Arquiteturais
 
-A stack foi selecionada sob a premissa de **"foco absoluto em eficiência e baixo volume de dados"**, infraestrutura imutável via Docker e otimização de recursos de hardware.
-* **Docker com Detecção de GPU (`start.sh`)**: Script de inicialização detecta automaticamente a presença de uma GPU Nvidia via `nvidia-smi` e aplica um override no docker-compose (`docker-compose.gpu.yml`). Isso garante que o projeto seja portável entre ambientes de desenvolvimento (CPU) e produção (GPU) sem alterações manuais de código.
-* **PostgreSQL 18 Tunado (Timescale + pgvector)**: A imagem Docker base do PostgreSQL foi customizada no `Dockerfile` e no `init.sql`.
-	* A memória `maintenance_work_mem` foi elevada para 1 GB para garantir a construção rápida de índices HNSW (crucial para RAG rápido).
-	* O `jit` foi desabilitado, pois em queries vetorizadas simples ele adiciona overhead desnecessário.
-	* O agrupamento de dados (`raw_data`, `metrics`, `embeddings`) em schema distintos no mesmo banco consolida a infraestrutura relacional, analítica e vetorial.
-* **Kedro Worker Efêmero (`run_job.sh`)**: O `kedro-worker` não roda continuamente. Ele é um container efêmero disparado sob demanda que morre após concluir o pipeline de dados, liberando memória do host. O script também reinicia o `streamlit` e o `kedro-viz` para limpar caches em memória após a carga de novos dados.
-* **FastAPI (gRPC)**: Atua como a ponte de comunicação entre o Streamlit (front-end) e o Agente RAG/Banco de Dados. O uso de gRPC garante tipagem estrita (Protobufs) e serialização binária ultrarrápida, mitigando a latência na transferência dos DataFrames e das respostas do SLM.
-* **Ollama (`OLLAMA_KEEP_ALIVE=10m`)**: Para equilibrar a latência de resposta com a eficiência de infraestrutura, o Ollama foi configurado para descarregar o SLM da VRAM da GPU após 10 minutos de inatividade (*idle*). Essa decisão de arquitetura garante que a GPU não fique bloqueada consumindo energia desnecessariamente enquanto o RAG não está em uso, aceitando um pequeno cold-start apenas na primeira requisição de uma nova sessão de uso do Streamlit.
-* **Cache de Modelos no Docker Build (UV)**: O `Dockerfile.app` utiliza a ferramenta `uv` e a montagem de cache (`--mount=type=cache`) no Docker para baixar o modelo `Sentence-Transformer` (`all-MiniLM-L6-v2`) durante a construção da imagem. Isso evita downloads redundantes a cada inicialização dos containers, isolando o ambiente.
+A stack foi selecionada sob a premissa de **"foco absoluto em eficiência, baixo volume de dados e otimização de VRAM/RAM"**.
+* **Arquitetura Unificada (Streamlit + Ibis)**: A decisão de remover uma camada intermediária de API (como FastAPI/gRPC) e rodar o Ibis diretamente no processo persistente do Streamlit reduz o footprint de memória e elimina a latência de rede interna. O transporte de dados via PyArrow entre o banco e a interface ocorre com eficiência máxima (_Zero-Copy_).
+- **Ollama (`OLLAMA_KEEP_ALIVE=5m`)**: Para proteger uma limitada VRAM e evitar travamentos no sistema operacional do Host, o Ollama foi configurado para descarregar o modelo SLM da memória da placa de vídeo após apenas 5 minutos de inatividade (_idle_). O modelo só ocupa VRAM quando ativamente consultado.
+- **Limitação de Recursos no Docker (Deploy Limits)**: Cada serviço no `docker-compose.yml` possui limites rígidos de RAM. Isso garante que o sistema do Host tenha fôlego de sobra para o SO e operações de disco, prevenindo _Out of Memory (OOM) kills_.
+- **PostgreSQL 18 Tunado (Timescale + pgvector)**: A imagem Docker base foi customizada.
+    - A memória `maintenance_work_mem` foi ajustada para suportar a criação de índices HNSW sem estourar a memória do container.
+    - O `jit` foi desabilitado, pois em consultas vetorizadas rápidas (típicas de RAG), a compilação _Just-in-Time_ adiciona latência desnecessária.
+- **Kedro Worker Efêmero e Profiles Docker**: Ferramentas de engenharia e observabilidade (Kedro e Kedro-Viz) não rodam continuamente. O uso de `profiles` no Docker Compose assegura que esses containers só consumam RAM e CPU durante as janelas de processamento batch (ETL) ou depuração.
+- **Cache de Modelos no Docker Build (UV)**: O `Dockerfile.app` utiliza o gerenciador de pacotes `uv` e a montagem de cache (`--mount=type=cache`) para baixar o modelo `Sentence-Transformer` durante o _build_. Isso isola o ambiente e garante inicializações instantâneas.
 
 <br>
 
@@ -129,11 +137,11 @@ O projeto é dividido em dois ciclos operacionais distintos: o processamento em 
 ### Fase 2: Motor Analítico RAG (Tempo Real via API e UI)
 
 1. **Input do Usuário**: O usuário envia uma pergunta na interface do Streamlit.
-2. **Camada API (FastAPI gRPC)**: O Streamlit envia a requisição para a API. A API centraliza a conexão persistente (pool de conexões) com todo o banco PostgreSQL (abrangendo os schemas `embeddings`, `raw_data`, `metrics`).
-3. **Busca Semântica (Hybrid Search)**: A API aciona o banco para realizar uma busca nos `embeddings`, utilizando recursos avançados configurados no `init.sql` (como `pg_trgm` para buscas híbridas ou índices dedicados), recuperando as tabelas e colunas com maior relevância para a pergunta.
-4. **Prompt Roteador (Text-to-SQL)**: O esquema retornado pela busca é enviado ao Ollama, que gera a query SQL.
-5. **Loop de Validação (Self-Correction)**: Prevenção de quebra do sistema por alucinação de IA. A API tenta executar a query (ou rodar um `EXPLAIN`) no banco. Se ocorrer um erro de sintaxe ou de mapeamento (ex: coluna inexistente), o erro do PostgreSQL é capturado e enviado de volta ao Ollama para correção automática.
-6. **Entrega e Visualização**: Com a query validada, a API extrai o DataFrame final do PostgreSQL, decide qual o melhor tipo de gráfico e trafega a resposta final via gRPC de volta para o Streamlit renderizar o Dashboard.
+2. **Vetorização Local**: O próprio backend persistente do Streamlit gera o _embedding_ da pergunta usando CPU.
+3. **Busca Semântica (Hybrid Search)**: O Streamlit, através de sua conexão persistente do Ibis, aciona o banco para realizar uma busca nos `embeddings`, utilizando recursos avançados (como `pg_trgm` ou índices dedicados), recuperando as tabelas e colunas com maior relevância.
+4. **Prompt Roteador (Text-to-SQL)**: O contexto recuperado é formatado e enviado ao serviço do Ollama, que atua apenas como motor de inferência, retornando a query SQL gerada.
+5. **Loop de Validação Automática**: O Streamlit tenta compilar a query recebida via Ibis. Se ocorrer erro de sintaxe ou mapeamento incorreto (ex: coluna alucinada pelo SLM), o erro é capturado pela aplicação e enviado de volta ao Ollama para correção (Self-Correction), protegendo a interface de quebras.
+6. **Entrega e Visualização**: Com a query validada, o Ibis executa a consulta no PostgreSQL. Os resultados trafegam de volta para o Streamlit em formato binário **PyArrow**, garantindo máxima velocidade de carregamento para a renderização do Dashboard.
 
 <br>
 
@@ -143,64 +151,62 @@ A camada de preparação de dados foi arquitetada sobre o framework **Kedro**, o
 
 ### 5.1. Observabilidade e Monitoramento de Recursos (Hooks e Logging)
 
-Em ambientes contêinerizados que compartilham hardware com modelos de IA (SLMs/GPUs), vazamentos de memória (*memory leaks*) ou picos de processamento na etapa de ETL podem derrubar o *Docker Host*. Para mitigar isso, implementamos:
-* **Logging Estruturado (`logging.yml`)**: Separação clara entre logs informativos e de erro, com rotatividade automática (`RotatingFileHandler` com backup de até 50 MB no total). Isso garante que o disco não encha com logs antigos do container efêmero.
+Em ambientes contêinerizados com limites estritos de memória, vazamentos (*memory leaks*) na etapa de ETL podem derrubar o *Docker Host*. Para mitigar isso, implementamos:
+* **Logging Estruturado (`logging.yml`)**: Separação clara entre logs informativos e de erro, com rotatividade automática (`RotatingFileHandler` com backup limitado). Evita o inchaço do armazenamento local.
 * **`ResourceMonitoringHook`**: Um hook injetado no ciclo de vida do Kedro que atua como um inspetor de recursos.
 	* Utiliza a biblioteca `psutil` para capturar a memória RAM exata (*RSS*) antes e depois da execução de cada *Node*.
 	* Mede o delta de memória e o tempo de execução (em segundos).
-	* Dispara *flags* de alerta (`HIGH MEMORY`) no log caso um nó ultrapasse o limite seguro estipulado no `parameters.yml` (ex: 1000 MB). Isso permite identificar imediatamente transformações não-otimizadas.
+	* Dispara *flags* de alerta (`HIGH MEMORY`) no log caso um nó ultrapasse o limite seguro estipulado no `parameters.yml`. Isso permite identificar imediatamente transformações não-otimizadas.
 
 ### 5.2. Otimização de Banco de Dados via Ciclo de Vida `CreateIndexesHook`
 
 A manipulação de dados em massa (Bulk Load) em tabelas que possuem índices complexos — especialmente os índices vetoriais `HNSW` do *pgvector* — sofre de grave degradação de performance.
 Para resolver isso, o `CreateIndexesHook` altera o fluxo padrão de DDL (Data Definition Language):
-1. `before_pipeline_run`: Conecta ao PostgreSQL e executa os scripts DDL iniciais para garantir que as tabelas do schema `raw_data` existam.
+1. `before_pipeline_run`: Conecta ao PostgreSQL e executa os scripts DDL iniciais para garantir que as tabelas do schema `raw_data` existam (sem índices).
 2. `after_pipeline_run`: Apenas após toda a carga de dados ser finalizada, o hook executa a criação dos índices (B-Tree para métricas e HNSW para vetores). Criar índices sobre tabelas já populadas é mais rápido e eficiente do que atualizar o índice linha a linha durante o *Insert*.
 
 ### 5.3. Ingestão de Alta Performance `IbisUpsertDataset`
 
-O gargalo de qualquer pipeline ETL moderno é a etapa de escrita no banco de dados. O Kedro nativo não oferece suporte eficiente para operações idempotentes de `UPSERT` usando Ibis/PostgreSQL. A classe `IbisUpsertDataset` foi criada para solucionar isso combinando o padrão *Factory* com serialização em baixo nível.
+O gargalo de qualquer pipeline ETL moderno é a etapa de escrita no banco de dados. O Kedro nativo não oferece suporte eficiente para operações idempotentes de `UPSERT` usando Ibis. A classe `IbisUpsertDataset` foi criada combinando o padrão *Factory* com serialização em baixo nível.
 Como funciona:
-1. **Zero-Copy e Arrow**: Os dados transformados pelo DuckDB são convertidos para `PyArrow`.
-2. **Protocolo Binário (`pgpq`)**: Em vez de gerar milhares de instruções `INSERT INTO` (que saturam a rede e a CPU), o dataset utiliza a biblioteca `pgpq` para codificar os dados do Arrow diretamente para o formato binário nativo do PostgreSQL.
-3. **Carga em Memória (COPY)**: Usa a instrução `COPY FROM STDIN WITH (FORMAT BINARY)` para jogar os dados em uma tabela temporária de forma quase instantânea.
-4. **Merge Inteligente (Upsert)**: Compara a tabela temporária com a tabela final. Ele gera dinamicamente uma cláusula `ON CONFLICT DO UPDATE` que só sobrescreve o dado se a linha original e a nova forem diferentes (`IS DISTINCT FROM`). Isso economiza operações de escrita em disco (I/O) e não infla o *Write-Ahead Log* (WAL) do banco à toa.
+1. **Zero-Copy e Arrow**: Os dados transformados pelo DuckDB são mantidos em `PyArrow`.
+2. **Protocolo Binário (`pgpq`)**: O dataset utiliza a biblioteca `pgpq` para codificar os dados do Arrow diretamente para o formato binário nativo do PostgreSQL, evitando a geração custosa de strings `INSERT INTO`.
+3. **Carga em Memória (COPY)**: Usa a instrução `COPY FROM STDIN WITH (FORMAT BINARY)` para carregar os dados em uma tabela temporária quase instantaneamente.
+4. **Merge Inteligente (Upsert)**: Compara a tabela temporária com a tabela final, gerando dinamicamente um `ON CONFLICT DO UPDATE` que só sobrescreve o dado se houver diferença real (`IS DISTINCT FROM`). Isso reduz o I/O de disco e o inchaço do *Write-Ahead Log* (WAL).
 
 ### 5.4. Catálogo Dinâmico e DRY `catalog.yml`
 
 O Catálogo de Dados foi desenhado seguindo o princípio *DRY* (*Don't Repeat Yourself*).
-* **Padrões Dinâmicos (`{table}`)**: Em vez de mapear dezenas de tabelas manualmente, o catálogo usa sintaxe de fábrica. A chamada `raw_{table}` mapeia automaticamente qualquer arquivo `.parquet` na camada `01_raw` através da engine do DuckDB em memória.
-* **YAML Anchors**: A configuração do banco de dados (esquema de destino, credenciais, uso da classe customizada `IbisUpsertDataset`) foi encapsulada no *anchor* `&postgres_upsert_base`. Para criar uma nova entidade no pipeline, basta referenciar a base e passar o `table_name`, tornando a manutenção do projeto limpa e escalável.
+* **Padrões Dinâmicos (`{table}`)**: A sintaxe de fábrica (ex:`raw_{table}`) mapeia automaticamente qualquer arquivo `.parquet` na camada `01_raw` através da engine do DuckDB, eliminando mapeamentos manuais extensivos.
+* **YAML Anchors**: Configurações repetitivas (credenciais, uso da classe `IbisUpsertDataset`) são encapsuladas no *anchor* `&postgres_upsert_base`. Adicionar uma nova entidade exige apenas referenciar a base e definir o `table_name`.
 
 ### 5.5. Pipeline de Processamento e Qualidade de Dados (`data_processing`)
 
-O pipeline de extração e transformação (`data_processing`) atua como a barreira de qualidade e integridade do Data Warehouse. Em vez de utilizar o Pandas tradicional, que carregaria todos os dados na RAM, o pipeline utiliza **Ibis** para delegar a computação para o DuckDB (arquivos brutos) e PostgreSQL, processando dados de forma vetorizada.
+O pipeline de extração e transformação (`data_processing`) atua como a barreira de qualidade. Utiliza o **Ibis** para delegar a computação pesada ao DuckDB e ao PostgreSQL de forma vetorizada.
+
 ### A. Validação de Qualidade em Passagem Única (Single-Pass Validation)
 
-Geralmente, validações de Data Quality (como verificar valores nulos, preços negativos ou limites geográficos) exigem múltiplas varreduras nos dados ou loops custosos.
-* `schema_rules.py`: Define um contrato estrito de dados contendo regras granulares (linhas) e regras estruturais (agregações, como detecção de duplicidade).
-* `_validate_ibis_table`: É o motor de regras. Em vez de validar linha a linha, esta função compila todas as regras do contrato em um **único bloco de agregações Ibis** e executa a query diretamente no banco/engine. Se qualquer regra violar a condição (retornando valor `> 0`), o pipeline aborta com um `ValueError`, detalhando exatamente a falha no log. Isso garante que "lixo não entre" no banco de dados (*Garbage in*, *Garbage Out*).
+* `schema_rules.py`: Define contratos estritos de dados (regras de linha e estruturais).
+* `_validate_ibis_table`: Em vez de loops de validação custosos, compila todas as regras em um **único bloco de agregações Ibis**. Executa a query no banco/engine, abortando o pipeline com um `ValueError` detalhando caso qualquer regra retorne uma violação (`> 0`). Garante a política "Lixo não entra".
 
 #### B. Proteção de Integridade Referencial Dinâmica (Cross-Engine Joins)
 
-Um dos maiores desafios de cargas em bancos relacionais é o erro de restrição de chave estrangeira (Foreign Key Constraint), que faz o pipeline inteiro "quebrar" na hora do `INSERT`.
-Para evitar isso, o pipeline realiza a higienização prévia dos dados através de uma técnica de **Cross-Engine Join**:
-1. O pipeline converte os IDs já validados no PostgreSQL para `PyArrow` e os carrega como uma `ibis.memtable` (tabela virtual em memória).
-2. Utiliza *joins* nos dados de origem e nos dados das *Foreign Keys* (que estão no DuckDB lendo o Parquet):
-	* **Anti-Join**: Identifica registros órfãos (ex: um Produto que aponta para um Centro de Distribuição que não existe) e os registra nos logs como *warnings* analíticos.
-	* **Semi-Join**: Filtra a base original, mantendo apenas as linhas que possuem correspondência válida.
-Isso garante que o comando final de `UPSERT` nunca falhe por falta de referências no banco.
+Para evitar quebras de pipeline por erros de chave estrangeira (FK), durante o `INSERT`:
+1. IDs validados do PostgreSQL são convertidos em `PyArrow` e carregados como `ibis.memtable` (tabela virtual em memória).
+2. Realiza-se um Cross-Engine Join entre a origem (DuckDB/Parquet) e as FKs validadas:
+	* **Anti-Join**: Identifica e registra nos logs (como *warnings*) os registros órfãos.
+	* **Semi-Join**: Filtra a base original, enviando para o Upsert apenas as linhas com correspondência válida no banco destino.
 
 #### C. Estratégias de Carga Incremental
 
-Como a arquitetura visa baixo consumo de recursos, recarregar a base inteira todos os dias é inviável. O pipeline emprega duas estratégias distintas de ingestão:
-* **Watermarking**: Para a tabela `inventory_items`, o nó consulta o banco de dados destino (`target`) para descobrir a data máxima inserida (`max(created_at)`). Apenas registros *posteriores* a esta data são processados.
-* **Moving Window**: Para tabelas transacionais altamente mutáveis (`orders` e `order_items`), o pipeline utiliza um `lookback` em dias (configurado no *parameters*). Ele processa apenas os pedidos dos últimos `X` dias, já que faturamentos antigos raramente sofrem atualização de status (de *Processing* para *Shipped*, por exemplo).
+Para manter a carga leve:
+* **Watermarking**: Tabelas de log (ex: `inventory_items`)consultam o destino para a data máxima inserida (`max(created_at)`), processando apenas registros novos.
+* **Moving Window**: Tabelas transacionais mutáveis (`orders` e `order_items`), usam um `lookback` configurável em dias, atualizando apenas pedidos recentes e ignorando históricos estáticos.
 
 #### D. Imutabilidade e Consistência Funcional
 
-A transformação de tipagem e regras de negócio (ex: garantir que a data de entrega não seja anterior à de envio) no arquivo `transform_tables.py` obedece a um fluxo puro: entra uma `ibis.Table`, sai uma `ibis.Table`.
-Para injetar as validações sem poluir a sintaxe visual do Kedro, foi criado o utilitário `create_node_func` (com `functools.partial`). Ele aplica os contratos de esquema de forma transparente, garantindo que o `kedro-viz` e os logs de terminal mostrem os nomes reais das funções, mantendo a observabilidade intacta.
+A lógica de transformação de negócio em `transform_tables.py` segue programação funcional (recebe `ibis.Table`, retorna `ibis.Table`).
+Para injetar as validações sem poluir a execução do Kedro, o utilitário `create_node_func` (`functools.partial`) aplica os contratos de esquema de forma transparente, garantindo que a observabilidade no `kedro-viz` e nos logs reflita as operações reais.
 
 
 ## Tech Stack
@@ -378,7 +384,7 @@ Este planejamento foca nas entregas lógicas, sem datas fixas.
 
 ### Fase 4: Consumo e Visualização
 
-- [ ] Configurar API gRPC e Protobufs.
+- [ ] Configurar API REST.
 - [ ] Configurar Streamlit.
 - [ ] Cria dashboard modelo no Streamlit.
 - [ ] Criar Dashboard no Streamlit.

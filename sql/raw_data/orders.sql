@@ -14,3 +14,7 @@ CREATE TABLE IF NOT EXISTS raw_data.orders (
 
     CONSTRAINT fk_orders_users FOREIGN KEY (user_id) REFERENCES raw_data.users (id)
 );
+
+COMMENT ON TABLE raw_data.orders IS 'Cabeçalho de pedidos dos usuários. Acompanha o status e as datas do ciclo de vida da entrega (funil logístico).';
+COMMENT ON COLUMN raw_data.orders.status IS 'Status atual do pedido. Valores permitidos: Processing, Shipped, Complete, Returned, Cancelled.';
+COMMENT ON COLUMN raw_data.orders.num_of_item IS 'Quantidade total de itens no pedido.';

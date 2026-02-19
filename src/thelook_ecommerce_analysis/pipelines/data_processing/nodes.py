@@ -7,6 +7,7 @@ import ibis
 
 from thelook_ecommerce_analysis.pipelines.data_processing.transform_tables import (
     transform_distribution_centers,
+    transform_events,
     transform_inventory_items,
     transform_order_items,
     transform_orders,
@@ -355,6 +356,33 @@ def extract_order_items(  # noqa: PLR0913
         )
 
     # 7. Validação
+    df = _validate_ibis_table(df, schema_rules)
+
+    return df
+
+
+def extract_events(
+    events: ibis.Table, schema_rules: dict[str, Any], columns: list[str]
+) -> ibis.Table:
+    """
+    Extração e limpeza dos dados brutos.
+
+    Args:
+        events (Table): Dados brutos a serem transformados.
+        schema_rules (dict[str, Any]): Regras do schema para validação.
+        columns (str): Colunas que serão utilizadas.
+
+    Returns:
+        Table: Dados prontos para ingestão no banco de dados.
+    """
+
+    # 1. Seleção de colunas
+    df = events.select(columns)
+
+    # 2. Tratamento
+    df = transform_events(df)
+
+    # 3. Validação do Schema
     df = _validate_ibis_table(df, schema_rules)
 
     return df

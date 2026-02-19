@@ -15,8 +15,8 @@ class TestDataProcessingPipeline:
     def test_pipeline_instance(self, pipeline: Pipeline) -> None:
         """Garante que o pipeline de data processing instância todos os nós corretamente."""
         assert isinstance(pipeline, Pipeline), "Deveria ser um Pipeline"
-        assert len(pipeline.nodes) == 6, (
-            "O pipeline deveria ter exatamente 6 nós de processamento"
+        assert len(pipeline.nodes) == 7, (
+            "O pipeline deveria ter exatamente 7 nós de processamento"
         )
 
     def test_pipeline_dependencies(self, pipeline: Pipeline) -> None:
@@ -27,6 +27,7 @@ class TestDataProcessingPipeline:
             "primary_users",
             "primary_orders",
             "primary_order_items",
+            "primary_events",
         }
         expected_inputs = {"primary_users", "primary_distribution_centers"}
         missing_outputs = expected_outputs - all_outputs

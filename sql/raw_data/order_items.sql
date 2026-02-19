@@ -20,3 +20,7 @@ CREATE TABLE IF NOT EXISTS raw_data.order_items (
     CONSTRAINT fk_order_items_products FOREIGN KEY (product_id) REFERENCES raw_data.products (id),
     CONSTRAINT fk_order_items_inventory_items FOREIGN KEY (inventory_item_id) REFERENCES raw_data.inventory_items (id)
 );
+
+COMMENT ON TABLE raw_data.order_items IS 'Tabela de granularidade mínima de vendas (nível de item). Liga o pedido genérico ao item físico exato do inventário e ao preço real de venda.';
+COMMENT ON COLUMN raw_data.order_items.sale_price IS 'Preço real pelo qual o item foi vendido (Receita). Pode diferir do retail_price da tabela products devido a descontos.';
+COMMENT ON COLUMN raw_data.order_items.inventory_item_id IS 'Chave estrangeira para o item físico único em raw_data.inventory_items.';

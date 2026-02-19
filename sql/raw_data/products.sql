@@ -11,3 +11,8 @@ CREATE TABLE IF NOT EXISTS raw_data.products (
 
     CONSTRAINT fk_products_distribution_centers FOREIGN KEY (distribution_center_id) REFERENCES raw_data.distribution_centers (id)
 );
+
+COMMENT ON TABLE raw_data.products IS 'Catálogo mestre de produtos. Representa modelos/tipos de produtos, não os itens físicos em estoque (veja inventory_items para estoque).';
+COMMENT ON COLUMN raw_data.products.cost IS 'Custo padrão de aquisição do produto.';
+COMMENT ON COLUMN raw_data.products.retail_price IS 'Preço de venda sugerido ao consumidor.';
+COMMENT ON COLUMN raw_data.products.distribution_center_id IS 'Chave estrangeira para raw_data.distribution_centers indicando o CD padrão do produto.';

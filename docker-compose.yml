@@ -17,9 +17,13 @@ services:
       - "${POSTGRES_PORT}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G # Modificar caso necessário
     networks:
       - thelook-net
 
@@ -36,6 +40,10 @@ services:
       - pgadmin_data:/var/lib/pgadmin
     ports:
       - "${PGADMIN_PORT}:80"
+    deploy:
+      resources:
+        limits:
+          memory: 300M
     networks:
       - thelook-net
 
@@ -78,15 +86,17 @@ services:
       - "${STREAMLIT_PORT}:8501"
     networks:
       - thelook-net
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G # Mudar caso necessário
     command: ["uv", "run", "streamlit", "run", "src/app.py"]
 
   kedro-viz:
     image: thelook-app-stack
-    build:
-      context: .
-      dockerfile: Dockerfile.app
     container_name: kedro-viz-server
-    restart: always
+    profiles:
+      - debug
     volumes:
       - kedro_experiments_data:/app/.kedro
       - ./src:/app/src

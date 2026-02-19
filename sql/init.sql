@@ -28,7 +28,7 @@ CREATE SCHEMA IF NOT EXISTS embeddings;
 -- 3. --- Configurações de Performance (Tuning para Vector/RAG) ---
 
 -- Aumenta memória para criação de índices (crucial para HNSW build rápido)
-ALTER SYSTEM SET maintenance_work_mem = '1GB';
+ALTER SYSTEM SET maintenance_work_mem = '512MB';
 
 -- Memória para operações de sort/hash por conexão
 ALTER SYSTEM SET work_mem = '64MB';

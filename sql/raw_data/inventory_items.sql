@@ -16,3 +16,8 @@ CREATE TABLE IF NOT EXISTS raw_data.inventory_items (
 
     CONSTRAINT fk_inventory_distribution FOREIGN KEY (product_distribution_center_id) REFERENCES raw_data.distribution_centers (id)
 );
+
+COMMENT ON TABLE raw_data.inventory_items IS 'Itens individuais no inventário. Cada linha é um produto físico único. Use para controle de estoque, custos e margens.';
+COMMENT ON COLUMN raw_data.inventory_items.sold_at IS 'Data em que o item foi vendido. Se for NULL, o item ainda está disponível em estoque.';
+COMMENT ON COLUMN raw_data.inventory_items.cost IS 'Custo de aquisição. Use junto com product_retail_price para calcular margem de lucro.';
+COMMENT ON COLUMN raw_data.inventory_items.product_distribution_center_id IS 'Chave estrangeira para raw_data.distribution_centers.';

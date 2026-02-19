@@ -5,6 +5,7 @@ import pandas as pd
 
 from thelook_ecommerce_analysis.pipelines.data_processing.transform_tables import (
     transform_distribution_centers,
+    transform_events,
     transform_inventory_items,
     transform_order_items,
     transform_orders,
@@ -128,3 +129,33 @@ class TestTransformTables:
         assert res_items["shipped_at"].iloc[0] == pd.Timestamp("2023-01-05"), (
             "Deveria ser um Timestamp"
         )
+
+    def test_transform_events(self) -> None:
+        """Valida tipagem, tratamento de nulos e inferência de visitor_type."""
+        df = pd.DataFrame(
+            {
+                "id": ["1", "2"],
+                "user_id": ["10", None],  # Testa lógica do visitor_type
+                "sequence_number": ["1", "2"],
+                "created_at": ["2023-01-01T00:00:00", "2023-01-01T00:00:00"],
+                "session_id": [None, "sess2"],
+                "city": [None, "City"],
+                "state": [None, "State"],
+                "browser": [None, "Chrome"],
+                "traffic_source": [None, "Organic"],
+                "event_type": [None, "product"],
+                "extracted_product_id": ["1", None],
+                "extracted_page_type": [None, "category"],
+            }
+        )
+        table = transform_events(ibis.memtable(df))
+        res = table.to_pandas()
+
+        assert res["visitor_type"].iloc[0] == "Registered", (
+            "user_id preenchido deve ser Registered"
+        )
+        assert res["visitor_type"].iloc[1] == "Guest", "user_id nulo deve ser Guest"
+        assert res["session_id"].iloc[0] == "Unknown", (
+            "Valores nulos de string devem virar 'Unknown'"
+        )
+        assert res["id"].dtype == "int32", "O dtype de 'id' deveria ser 'int32'"
