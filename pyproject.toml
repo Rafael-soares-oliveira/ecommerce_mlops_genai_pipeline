@@ -119,12 +119,6 @@ classmethod-decorators = ["pydantic.validator", "declared_atrr"] #
 [tool.ruff.lint.per-file-ignores]
 "*.ipynb" = ["T201"] # Permite print em notebooks
 "tests/*" = ["S101", "PLR2004"] # Permite assert nos testes | Permite passar magic value ao invés de variáveis
-"src/app.py" = ["PLC0415", "TC004"]
-
-[tool.pyright]
-executionEnvironments = [
-  { root = "src/app.py", reportMissingImports = "none" }
-]
 
 [tool.pytest.ini_options]
 minversion = "9.0"

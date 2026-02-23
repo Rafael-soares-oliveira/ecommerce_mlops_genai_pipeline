@@ -34,7 +34,7 @@ jobs:
         run: uv run ruff check .
 
       - name: Type check
-        run: uv run ty check . --ignore-rule unresolved-import
+        run: uv run ty check .
 
       - name: Test with Pytest
         run: uv run pytest --cov-fail-under=80

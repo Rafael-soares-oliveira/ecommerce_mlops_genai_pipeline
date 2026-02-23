@@ -1,11 +1,7 @@
 import os
-from typing import TYPE_CHECKING
 
 import streamlit as st
-
-if TYPE_CHECKING:
-    from sentence_transformers import SentenceTransformer  # noqa: TC004
-
+from sentence_transformers import SentenceTransformer
 
 # Configurações de página
 st.set_page_config(page_title="TheLook RAG", layout="wide")
@@ -16,7 +12,6 @@ st.set_page_config(page_title="TheLook RAG", layout="wide")
 def load_embedding_model(model_name: str, device: str) -> SentenceTransformer:
     # O modelo será buscado em /app/model_cache automaticamente por causa do HF_HOME
     st.info(f"Carregando modelo {model_name} para a RAM...")
-    from sentence_transformers import SentenceTransformer  # noqa: PLC0415
 
     return SentenceTransformer(model_name, device=device)
 
