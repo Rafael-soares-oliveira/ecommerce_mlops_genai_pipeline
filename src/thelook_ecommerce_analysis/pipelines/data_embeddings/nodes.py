@@ -2,7 +2,7 @@ import logging
 
 import ibis
 import polars as pl
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer  # ty: ignore
 
 logger = logging.getLogger(__name__)
 
