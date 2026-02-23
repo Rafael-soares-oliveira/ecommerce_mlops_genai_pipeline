@@ -1,4 +1,5 @@
 import logging
+from datetime import UTC, datetime
 
 import ibis
 import pandas as pd
@@ -279,7 +280,7 @@ class TestDataProcessingNodes:
         mock_datetime = mocker.patch(
             "thelook_ecommerce_analysis.pipelines.data_processing.nodes.datetime_"
         )
-        mock_datetime.now.return_value = pd.Timestamp("2023-01-01", tz="UTC")
+        mock_datetime.now.return_value = datetime(2023, 1, 1, tzinfo=UTC)
 
         res = extract_orders(
             orders_table,
@@ -320,7 +321,7 @@ class TestDataProcessingNodes:
         mock_datetime = mocker.patch(
             "thelook_ecommerce_analysis.pipelines.data_processing.nodes.datetime_"
         )
-        mock_datetime.now.return_value = pd.Timestamp("2023-01-05", tz="UTC")
+        mock_datetime.now.return_value = datetime(2023, 1, 5, tzinfo=UTC)
 
         # Act
         res = extract_order_items(
@@ -357,11 +358,7 @@ class TestDataProcessingNodes:
         )
 
     def test_extract_inventory_items_full_load(self, mocker: MockerFixture) -> None:
-        """
-        Testa:
-        1. A exceção de Carga Full (quando a tabela target falha ao retornar max_date).
-        2. O fluxo completo de semi-join/anti-join com produtos órfãos.
-        """
+        """Testa a exceção de Carga Full e o fluxo de anti-join com produtos órfãos."""
         spy_logger = mocker.spy(
             logging.getLogger(
                 "thelook_ecommerce_analysis.pipelines.data_processing.nodes"
@@ -392,9 +389,9 @@ class TestDataProcessingNodes:
         dc_table = ibis.memtable(dc_df)
 
         # Mockamos o target para forçar a Exceção do Watermark (Carga Total)
-        target_mock = mocker.Mock()
-        type(target_mock).created_at = mocker.PropertyMock(
-            side_effect=Exception("Table not found")
+        target_mock = mocker.MagicMock()
+        target_mock.created_at.max.return_value.to_pyarrow.return_value.as_py.side_effect = Exception(
+            "Table not found"
         )
 
         res = extract_inventory_items(
@@ -487,7 +484,7 @@ class TestDataProcessingNodes:
         mock_datetime = mocker.patch(
             "thelook_ecommerce_analysis.pipelines.data_processing.nodes.datetime_"
         )
-        mock_datetime.now.return_value = pd.Timestamp("2023-01-06", tz="UTC")
+        mock_datetime.now.return_value = datetime(2023, 1, 6, tzinfo=UTC)
 
         # 1. Testa Caminho Feliz com Drop de FK (Gera warning)
         res = extract_orders(
@@ -546,7 +543,7 @@ class TestDataProcessingNodes:
         mock_datetime = mocker.patch(
             "thelook_ecommerce_analysis.pipelines.data_processing.nodes.datetime_"
         )
-        mock_datetime.now.return_value = pd.Timestamp("2023-01-06", tz="UTC")
+        mock_datetime.now.return_value = datetime(2023, 1, 6, tzinfo=UTC)
 
         # 1. Caminho Feliz com descarte
         res = extract_order_items(
@@ -597,6 +594,7 @@ class TestDataProcessingNodes:
                 "state": ["SP"],
                 "browser": ["Chrome"],
                 "traffic_source": ["Organic"],
+                "uri": ["URI"],
                 "event_type": ["product"],
                 "extracted_product_id": [100],
                 "extracted_page_type": ["product_page"],

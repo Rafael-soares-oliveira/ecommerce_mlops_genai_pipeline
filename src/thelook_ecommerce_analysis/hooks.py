@@ -144,16 +144,25 @@ class CreateIndexesHook:
         return create_engine(creds["con"])
 
     def _execute_sql_files(self, engine: Engine, files_dict: dict):
-        """Executa os scripts SQL."""
         with engine.connect() as conn:
             for name, relative_path in files_dict.items():
                 sql_path = Path(relative_path)
                 if sql_path.exists():
-                    self.logger.info(f"Executando SQL: {name}")
-                    conn.execute(text(sql_path.read_text(encoding="utf-8")))
-                    conn.commit()
+                    content = sql_path.read_text(encoding="utf-8")
+                    # Divide o arquivo por ponto e vírgula e remove linhas vazias
+                    commands = [c.strip() for c in content.split(";") if c.strip()]
+
+                    for i, cmd in enumerate(commands, 1):
+                        # Extrai o nome do índice para o log (regex simples ou busca de string)
+                        cmd_summary = cmd.split("\n")[0][:50]
+                        self.logger.info(
+                            f"[{name}] Executando parte {i}/{len(commands)}: {cmd_summary}..."
+                        )
+
+                        conn.execute(text(cmd))
+                        conn.commit()  # Commit por comando para liberar logs do Postgres
                 else:
-                    self.logger.warning(f"Arquivo SQL não encontrado: {sql_path}")
+                    self.logger.warning(f"Arquivo não encontrado: {sql_path}")
 
     @hook_impl
     def before_pipeline_run(
@@ -182,3 +191,4 @@ class CreateIndexesHook:
             self.logger.info("Criando índices finais...")
             engine = self._get_engine(run_params)
             self._execute_sql_files(engine, params["indexes"])
+        self.logger.info("Índices criados com sucesso.")

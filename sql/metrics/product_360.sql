@@ -1,3 +1,4 @@
+/*
 WITH sales_metrics AS (
 	SELECT
 		oi.product_id,
@@ -44,6 +45,7 @@ FROM raw_data.products p
 LEFT JOIN sales_metrics sa ON p.id = sa.product_id
 LEFT JOIN stock_metrics st ON p.id = st.product_id
 ORDER BY avg_aging_days DESC;
+*/
 
 COMMENT ON VIEW analytics.product_performance IS 'Visão consolidada de performance de produtos. Une métricas de vendas (margem, devolução, ticket médio) com saúde de estoque (aging e quantidade).';
 COMMENT ON COLUMN analytics.product_performance.avg_aging_days IS 'Média de dias que o estoque do produto está parado (sem vender).';

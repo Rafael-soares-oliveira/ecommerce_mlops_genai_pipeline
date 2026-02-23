@@ -23,6 +23,9 @@ _postgres_upsert_base: &postgres_upsert_base
   connection:
     backend: postgresql
     schema: raw_data
+  metadata:
+    kedro-viz:
+      layer: Processing
 
 # Apenas para consulta de Watermark
 primary_consult_inventory_items:
@@ -36,3 +39,61 @@ primary_consult_inventory_items:
     materialized: table
     mode: upsert
     global_config: ${globals:tables}
+
+embedding_model:
+  type: thelook_ecommerce_analysis.datasets.sentence_transformers_model.SentenceTransformerDataset
+  model_name: "all-MiniLM-L6-v2"
+  device: "cpu" # Pode ser alterado para 'cuda' se houver GPU disponível
+  metadata:
+    kedro-viz:
+      layer: Embedding
+
+create_map_hotpots_h3:
+  type: thelook_ecommerce_analysis.datasets.sql_executable_dataset.PostGISScriptDataset
+  credentials: postgres
+  sql_script: sql/embeddings/map_hotspots_h3.sql
+  metadata:
+    kedro-viz:
+      layer: Embedding
+
+create_fct_user_logistics:
+  type: thelook_ecommerce_analysis.datasets.sql_executable_dataset.PostGISScriptDataset
+  credentials: postgres
+  sql_script: sql/embeddings/fct_user_logistics.sql
+  metadata:
+    kedro-viz:
+      layer: Embedding
+
+create_fct_vector_geo_search:
+  type: thelook_ecommerce_analysis.datasets.sql_executable_dataset.PostGISScriptDataset
+  credentials: postgres
+  sql_script: sql/embeddings/fct_vector_geo_search.sql
+  metadata:
+    kedro-viz:
+      layer: Embedding
+
+create_products_embeddings:
+  type: thelook_ecommerce_analysis.datasets.sql_executable_dataset.PostGISScriptDataset
+  credentials: postgres
+  sql_script: sql/embeddings/products_embeddings.sql
+  metadata:
+    kedro-viz:
+      layer: Embedding
+
+_vector_geo_settings: &vector_geo_settings
+  type: thelook_ecommerce_analysis.datasets.polars_adbc_dataset.PolarsVectorADBCDataset
+  credentials: postgres_adbc
+  schema: embeddings
+  metadata:
+    kedro-viz:
+      layer: Embedding
+
+products_embeddings:
+  <<: *vector_geo_settings
+  table_name: products_embeddings
+  has_geo: false
+
+fct_vector_geo_search_embeddings:
+  <<: *vector_geo_settings
+  table_name: fct_vector_geo_search
+  has_geo: true

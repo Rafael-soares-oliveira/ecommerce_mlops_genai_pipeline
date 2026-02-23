@@ -6,6 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: thelook_postgres
     restart: always
+    shm_size: 2GB
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -23,7 +24,27 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G # Modificar caso necessário
+          memory: 4G # Modificar caso necessário
+    command:
+      - "postgres"
+      - "-c"
+      - "maintenance_work_mem=1GB"
+      - "-c"
+      - "work_mem=128MB"
+      - "-c"
+      - "max_parallel_workers_per_gather=4"
+      - "-c"
+      - "max_parallel_workers=8"
+      - "-c"
+      - "max_worker_processes=12"
+      - "-c"
+      - "effective_io_concurrency=200"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "timescaledb.max_background_workers=4"
+      - "-c"
+      - "jit=off"
     networks:
       - thelook-net
 
@@ -43,7 +64,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 300M
+          memory: 500M
     networks:
       - thelook-net
 
@@ -57,6 +78,7 @@ services:
       - thelook-net
     environment:
       - OLLAMA_KEEP_ALIVE=5m
+      - OLLAMA_KV_CACHE_TYPE="q8_0"
 
   streamlit:
     build:
@@ -64,6 +86,7 @@ services:
       dockerfile: Dockerfile.app
       args:
         EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME}
+    image: thelook-app-stack:latest
     container_name: streamlit-ui
     restart: always
     depends_on:
@@ -78,10 +101,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
+      - .:/app
       - duckdb_storage:/app/data/duckdb
       - sentence_transformers_cache:/app/model_cache
-      - ./src:/app/src
-      - ./conf:/app/conf
     ports:
       - "${STREAMLIT_PORT}:8501"
     networks:
@@ -90,25 +112,43 @@ services:
       resources:
         limits:
           memory: 1.5G # Mudar caso necessário
-    command: ["uv", "run", "streamlit", "run", "src/app.py"]
+    command:
+      ["uv", "run", "streamlit", "run", "src/app.py", "--server.address", "0.0.0.0"]
 
   kedro-viz:
-    image: thelook-app-stack
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+      args:
+        EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME}
+    image: thelook-app-stack:latest
     container_name: kedro-viz-server
     profiles:
       - debug
     volumes:
+      - .:/app
       - kedro_experiments_data:/app/.kedro
-      - ./src:/app/src
-      - ./conf:/app/conf
+      - sentence_transformers_cache:/app/model_cache
     ports:
       - "${KEDRO_PORT}:4141"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      HF_HOME: /app/model_cache
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     networks:
       - thelook-net
-    command: uv run kedro viz run --host 0.0.0.0 --port 4141 --include-hooks --no-browser
+    command: uv run kedro viz run --host 0.0.0.0 --port 4141 --include-hooks
 
   kedro-worker:
-    image: thelook-app-stack
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+      args:
+        EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME}
+    image: thelook-app-stack:latest
     container_name: kedro-job-runner
     profiles:
       - etl
@@ -120,10 +160,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
+      - .:/app
       - sentence_transformers_cache:/app/model_cache
       - kedro_experiments_data:/app/.kedro
-      - ./src:/app/src
-      - ./conf:/app/conf
       - ./data/01_raw:/app/data/01_raw:ro
       - ./sql/raw_data:/app/sql/raw_data:ro
       - ./sql/embeddings:/app/sql/embeddings:ro

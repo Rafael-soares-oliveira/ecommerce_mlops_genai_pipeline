@@ -31,7 +31,9 @@ dependencies = [
     "psycopg[binary]>=3.3.2",
     "pyarrow>=23.0.0",
     "python-dotenv>=1.2.1",
+    "shapely>=2.1.2",
     "sqlalchemy>=2.0.46",
+    "sqlglot[rs]>=28.10.1",
     "streamlit>=1.54.0",
 ]
 
@@ -176,3 +178,6 @@ exclude_lines = [
 [tool.coverage.html]
 directory = "htmlcov"
 title = "Coverage Report - Ecommerce MLOps & GenAI Pipeline"
+
+[tool.kedro_telemetry]
+project_id = "e4486b1f4da04df780f1229bc77bf5fc"

@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS embeddings.fct_vector_geo_search (
 
     -- Metadados para o RAG e filtros rápidos (Text-to-SQL)
     city TEXT,
+    state TEXT,
     country TEXT,
     avg_spend DOUBLE PRECISION,
     chunk_text TEXT NOT NULL, -- O texto que gerou o embedding (essencial para o RAG)

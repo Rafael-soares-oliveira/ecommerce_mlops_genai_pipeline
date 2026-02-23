@@ -1,3 +1,4 @@
+/*
 WITH metrics AS (
 	SELECT
 		CAST(DATE_TRUNC('day', oi.created_at) AS date) as day,
@@ -48,7 +49,7 @@ SELECT
 	cancellation_rate::numeric(5, 2),
 	returns_rate::numeric(5, 2)
 FROM final_metrics;
-
+*/
 
 COMMENT ON VIEW analytics.daily_sales IS 'Métricas financeiras e logísticas agregadas por dia e país. Use para analisar GMV, receita, lucro bruto e taxas de conversão/perda.';
 COMMENT ON COLUMN analytics.daily_sales.gmv IS 'Volume Bruto de Mercadorias (vendas brutas). Exclui apenas pedidos cancelados.';

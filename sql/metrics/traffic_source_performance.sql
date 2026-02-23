@@ -1,3 +1,4 @@
+/*
 SELECT
 	u.traffic_source,
 	COUNT(DISTINCT u.id) AS acquired_users,
@@ -9,6 +10,7 @@ LEFT JOIN raw_data.orders o ON u.id = o.user_id
 LEFT JOIN raw_data.order_items oi ON o.order_id = oi.order_id
 GROUP BY 1
 ORDER BY 5 DESC;
+*/
 
 COMMENT ON VIEW analytics.traffic_source_performance IS 'Métricas de aquisição e conversão de marketing agrupadas por origem de tráfego.';
 COMMENT ON COLUMN analytics.traffic_source_performance.user_conversion_rate IS 'Percentual de usuários cadastrados no canal que realizaram pelo menos uma compra.';

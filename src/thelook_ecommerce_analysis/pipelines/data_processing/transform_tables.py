@@ -6,36 +6,49 @@ def transform_users(users: ir.Table) -> ir.Table:
     """
     Aplica as transformações de negócio e tipagem.
     """
-    users = users.mutate(
-        id=users.id.cast("int32"),
-        age=users.age.abs().fill_null(0).cast("int16"),
-        gender=users.gender.fill_null("Others"),
-        state=users.state.fill_null("Unknown"),
-        city=users.city.fill_null("Unknown"),
-        country=users.country.fill_null("Unknown"),
-        traffic_source=users.traffic_source.fill_null("Unknown"),
-        latitude=users.latitude.clip(-90, 90).fill_null(0.0),
-        longitude=users.longitude.clip(-180, 180).fill_null(0.0),
+
+    user_id = users.id.cast("int32")
+    age = users.age.abs().fill_null(0)
+    gender = users.gender.fill_null("Others")
+    state = users.state.fill_null("Unknown").replace("null", "Unknown")
+    city = users.city.fill_null("Unknown").replace("null", "Unknown")
+    country = users.country.fill_null("Unknown").replace("null", "Unknown")
+    source = users.traffic_source.fill_null("Unknown").replace("null", "Unknown")
+    lat = users.latitude.clip(-90, 90).fill_null(0.0)
+    lon = users.longitude.clip(-180, 180).fill_null(0.0)
+
+    # --- 2. Construção da String de Contexto ---
+    # Usamos as variáveis que já garantimos que não são nulas
+    summary = (
+        ibis.literal("User profile: ")
+        + gender
+        + ", "
+        + age.cast("string")
+        + " years old, located_in "
+        + city
+        + ", "
+        + state
+        + ", "
+        + country
+        + ". Acquired via "
+        + source
+        + "."
     )
 
-    users = users.mutate(
-        context_summary=(
-            ibis.literal("User profile: ")
-            + users.gender
-            + ", "
-            + users.age.cast("string")
-            + " years old, located_in "
-            + users.city
-            + ", "
-            + users.state
-            + ", "
-            + users.country
-            + ". Acquired via "
-            + users.traffic_source
-            + "."
-        )
+    # --- 3. Aplicação final no mutate ---
+    # O mutate recebe as expressões prontas
+    return users.mutate(
+        id=user_id,
+        age=age.cast("int16"),
+        gender=gender,
+        state=state,
+        city=city,
+        country=country,
+        traffic_source=source,
+        latitude=lat,
+        longitude=lon,
+        context_summary=summary,
     )
-    return users
 
 
 def transform_distribution_centers(dc: ir.Table) -> ir.Table:
@@ -149,10 +162,20 @@ def transform_order_items(oi: ir.Table) -> ir.Table:
 
 def transform_events(events: ir.Table) -> ir.Table:
     """Aplica transformações e enriquece dados para simplificar queries do RAG."""
+    # 1. Window Function para propagar user_id na sessão, tratar uri e sequence_number
+    window = ibis.window(group_by="session_id")
+    events = events.mutate(
+        user_id=events.user_id.max().over(window).cast("int32"),
+        sequence_number=events.sequence_number.abs().cast("int32"),
+        uri=events.uri.re_replace(r"https?://", "").re_replace(
+            r"^/|/$", ""
+        ),  # Limpa protocolo e barras
+    )
+
+    # 2. Regra lógica do visitante
     return events.mutate(
+        visitor_type=events.user_id.isnull().ifelse("Guest", "Registered"),
         id=events.id.cast("int32"),
-        user_id=events.user_id.cast("int32"),
-        sequence_number=events.sequence_number.cast("int32"),
         created_at=events.created_at.cast("timestamp"),
         session_id=events.session_id.fill_null("Unknown"),
         city=events.city.fill_null("Unknown"),
@@ -160,8 +183,9 @@ def transform_events(events: ir.Table) -> ir.Table:
         browser=events.browser.fill_null("Unknown"),
         traffic_source=events.traffic_source.fill_null("Unknown"),
         event_type=events.event_type.fill_null("Unknown"),
-        # Materializa status do visitante para evitar lógicas de NULL no RAG
-        visitor_type=events.user_id.isnull().ifelse("Guest", "Registered"),
-        extracted_product_id=events.extracted_product_id.cast("int32"),
-        extracted_page_type=events.extracted_page_type.fill_null("Unknown"),
+        # Extrações da URI limpa
+        extracted_product_id=events.uri.re_extract(r"product/(\d+)", 1)
+        .nullif("")
+        .cast("int32"),
+        extracted_page_type=events.uri.split("/")[0].fill_null("Unknown"),
     )

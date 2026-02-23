@@ -13,6 +13,7 @@ from .nodes import (
 )
 from .schema_rules import (
     distribution_centers_schema,
+    events_schema,
     inventory_items_schema,
     order_items_schema,
     orders_schema,
@@ -110,7 +111,7 @@ def create_pipeline(**kwargs) -> Pipeline:
                 tags=["raw", "order_items"],
             ),
             Node(
-                func=create_node_func(extract_events, schema_rules=users_schema),
+                func=create_node_func(extract_events, schema_rules=events_schema),
                 inputs={
                     "events": "raw_events",
                     "columns": "params:tables.events.columns",

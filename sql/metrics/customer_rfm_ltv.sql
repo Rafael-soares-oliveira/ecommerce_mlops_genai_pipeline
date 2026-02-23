@@ -1,3 +1,4 @@
+/*
 WITH ref_date AS (
 	SELECT max(created_at)::date + 1 AS snapshot_date
 	FROM raw_data.order_items
@@ -43,6 +44,7 @@ SELECT
 	end AS customer_segment
 FROM rfm_scores
 ORDER BY ltv DESC;
+*/
 
 COMMENT ON VIEW analytics.customer_rfm IS 'Métricas de RFM (Recency, Frequency, Monetary) e segmentação de clientes. Use para análises de LTV, churn e valor do cliente.';
 COMMENT ON COLUMN analytics.customer_rfm.customer_segment IS 'Segmentação de negócio (ex: Champions, At Risk, Hibernating).';

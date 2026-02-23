@@ -2,6 +2,9 @@
 
 set -e
 
+# Remover em caso de encerramento forçado
+trap 'rm -f docker-compose.gpu.yml' EXIT
+
 echo "Iniciando Stack Ecommerce MLOps & GenAI Pipeline..."
 
 # 1. Carrega variáveis
@@ -26,7 +29,7 @@ services:
                 reservations:
                     devices:
                         - driver: nvidia
-                          count: all
+                          count: 1
                           capabilities: [gpu]
 EOF
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.gpu.yml"
@@ -36,11 +39,24 @@ fi
 
 # 3. BUILD & START
 echo "Construindo e subindo serviços..."
-docker compose $COMPOSE_FILES up -d --build
+
+read -p "Deseja executar com flag --build? [y/N] " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "Executando docker compose up -d --build..."
+    docker compose $COMPOSE_FILES up -d --build
+
+else
+    echo "Executando docker compose up -d..."
+    docker compose $COMPOSE_FILES up -d
+fi
 
 # 4. OLLAMA
 echo "Verificando modelo Ollama ($OLLAMA_MODEL)..."
-docker compose exec -d ollama ollama pull $OLLAMA_MODEL
+if ! docker compose exec ollama ollama show "$OLLAMA_MODEL" > /dev/null 2>&1; then
+    echo "Modelo não encontrado. Baixando $OLLAMA_MODEL..."
+    docker compose exec ollama ollama pull "$OLLAMA_MODEL"
+fi
 
 echo "Ambiente Online!"
 echo "Streamlit: http://localhost:$STREAMLIT_PORT"

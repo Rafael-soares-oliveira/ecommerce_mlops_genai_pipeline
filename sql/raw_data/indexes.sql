@@ -59,20 +59,3 @@ CREATE INDEX IF NOT EXISTS idx_users_city ON raw_data.users(city);
 CREATE INDEX IF NOT EXISTS idx_users_geom ON raw_data.users USING GIST (user_geom);
 
 CREATE INDEX IF NOT EXISTS idx_distribution_centers_geom ON raw_data.distribution_centers USING GIST (distribution_center_geom);
-
--- 2. Transformação em Hypertable
--- Particionando por 'created_at' usando intervalo de 1 mês por chunk.
-SELECT create_hypertable(
-    'raw_data.events',
-    'created_at',
-    chunk_time_interval => INTERVAL '1 month',
-    if_not_exists => TRUE,
-    migrate_data => TRUE
-);
-
--- 3. Configurar Compressão (Segmentada por session_id para o funil)
-ALTER TABLE raw_data.events SET (
-    timescaledb.compress,
-    timescaledb.compress_segmentby = 'session_id, id',
-    timescaledb.compress_orderby = 'created_at DESC'
-);

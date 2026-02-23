@@ -12,9 +12,9 @@ CREATE TABLE IF NOT EXISTS raw_data.events (
     traffic_source TEXT NOT NULL,
     uri TEXT,
     event_type TEXT CHECK (event_type IN ('product', 'department', 'cart', 'purchase', 'cancel', 'home')),
-    visitor_type TEXT NOT NULL, -- Coluna criada via pipeline
-    extracted_product_id INTEGER NOT NULL, -- Coluna criada via pipeline
-    extracted_page_type TEXT NOT NULL, -- Coluna criada via pipeline
+    visitor_type TEXT, -- Coluna criada via pipeline
+    extracted_product_id INTEGER, -- Coluna criada via pipeline
+    extracted_page_type TEXT, -- Coluna criada via pipeline
     PRIMARY KEY (id, created_at) -- PK Composta para Hypertables
 );
 
@@ -22,3 +22,13 @@ COMMENT ON TABLE raw_data.events IS 'Dados de navegação web (clickstream) dos 
 COMMENT ON COLUMN raw_data.events.session_id IS 'Identificador único da sessão. Agrupa uma sequência de eventos de um mesmo acesso.';
 COMMENT ON COLUMN raw_data.events.event_type IS 'Ação mapeada do usuário. Valores estritos: product, department, cart, purchase, cancel, home.';
 COMMENT ON COLUMN raw_data.events.extracted_product_id IS 'ID do produto acessado, derivado do evento. Útil para cruzar visualizações com a tabela products.';
+
+-- Transformação em Hypertable
+-- Particionando por 'created_at' usando intervalo de 1 mês por chunk.
+SELECT create_hypertable(
+    'raw_data.events',
+    'created_at',
+    chunk_time_interval => INTERVAL '1 month',
+    if_not_exists => TRUE,
+    migrate_data => TRUE
+);

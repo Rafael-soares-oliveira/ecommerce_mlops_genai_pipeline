@@ -8,7 +8,7 @@ __pycache__/
 *.pyc
 
 # --- Configurações Locais e Segredos ---
-conf/local/
+# conf/local/
 .env
 
 # --- Arquivos de Desenvolvimento e Testes ---

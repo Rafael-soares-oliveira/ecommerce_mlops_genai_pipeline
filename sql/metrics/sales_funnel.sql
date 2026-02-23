@@ -1,3 +1,4 @@
+/*
 WITH funil AS (
 	SELECT
 		EXTRACT(YEAR FROM created_at) AS year,
@@ -26,6 +27,7 @@ SELECT
 FROM funil
 GROUP BY 1
 ORDER BY 1;
+*/
 
 COMMENT ON VIEW analytics.sales_funnel IS 'Métricas de funil de conversão agregadas por ano. Acompanha a jornada do usuário desde a visualização até a compra e taxas de abandono.';
 COMMENT ON COLUMN analytics.sales_funnel.abandon_cart IS 'Taxa de abandono de carrinho (%). Usuários que adicionaram ao carrinho mas não compraram.';
