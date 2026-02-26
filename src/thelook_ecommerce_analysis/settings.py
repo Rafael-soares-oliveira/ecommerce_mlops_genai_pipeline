@@ -17,6 +17,9 @@ CONFIG_LOADER_ARGS = {
             "parameters*",
             "parameters*/**",
             "globals.yml",
-        ]
+        ],
+    },
+    "custom_resolvers": {
+        "oc.env": lambda var, default=None: __import__("os").getenv(var, default)
     },
 }

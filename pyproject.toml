@@ -12,9 +12,7 @@ readme = "README.md"
 authors = [
     { name = "Rafael" }
 ]
-dynamic = [
-    "version",
-]
+version = "0.1.0"
 dependencies = [
     "adbc-driver-postgresql>=1.10.0",
     "connectorx>=0.4.5",
@@ -61,9 +59,6 @@ thelook-ecommerce-analysis = "thelook_ecommerce_analysis.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/thelook_ecommerce_analysis"]
-
-[tool.hatch.version]
-path = "src/thelook_ecommerce_analysis/__init__.py"
 
 [tool.kedro]
 package_name = "thelook_ecommerce_analysis"
@@ -180,4 +175,4 @@ directory = "htmlcov"
 title = "Coverage Report - Ecommerce MLOps & GenAI Pipeline"
 
 [tool.kedro_telemetry]
-project_id = "e4486b1f4da04df780f1229bc77bf5fc"
+project_id = "840111ab2ebd4c09a7ddf15b70845074"

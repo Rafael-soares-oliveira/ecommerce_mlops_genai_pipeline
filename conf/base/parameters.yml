@@ -14,7 +14,7 @@ indexes:
 order_lookback_days: 180 # 6 meses. Pedidos mais velhos que isso não são atualizados
 
 embedding:
-  embedding_model: all-MiniLM-L6-v2
+  embedding_model: ${oc.env:EMBEDDING_MODEL_NAME, "all-MiniLM-L6-v2"}
   batch_size: 256
   device: "cpu"
 
@@ -22,4 +22,4 @@ metrics:
   returns_cost: 0.10 # 10% do custo da logística reversa em caso de devolução
   cohort_limit: 12 # 12 meses
 
-rag_model: deepseek-r1:1.5b
+rag_model: ${oc.env:OLLAMA_MODEL, "qwen2.5-coder:1.5b"}

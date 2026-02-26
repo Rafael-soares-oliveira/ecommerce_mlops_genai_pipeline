@@ -88,18 +88,18 @@ graph LR
 ```
 
 
-### 2.1. Detalhamento dos Componentes
+## 2.1. Detalhamento dos Componentes
 
-#### Infraestrutura e Pipeline Batch (ETL)
+### Infraestrutura e Pipeline Batch (ETL)
 * ⏰ **Cron**: Agendador local responsável por disparar o script de orquestração (`run_job.sh`) em janelas de tempo pré-definidas para ingestão incremental.
 * ⚙️ **Kedro Worker (Ibis + DuckDB)**: Container efêmero que encapsula a lógica de extração e transformação. Utiliza a engine do DuckDB via Ibis para processar os arquivos Parquet de forma vetorizada, mitigando o alto consumo de RAM. Após a execução, o container é encerrado, liberando recursos do Host.
 * 🧠 **Sentence-Transfomers**: Etapa do pipeline responsável por ler o dicionário de dados e metadados estruturados, convertendo-os em representações vetoriais (embeddings) para carga no banco.
 * 🔍 **Kedro Viz**: Serviço de documentação visual sob demanda. Lê os metadados gerados pelo Kedro Worker para exibir o grafo de dependências e a linhagem dos dados (*Data Lineage*). Só consome recursos quanto ativado manualmente.
 
-#### Camada de Persistência
+### Camada de Persistência
 * 🗄️ **PostgreSQL 18 (Tuned)**: Banco de dados relacional e vetorial tunado para alta performance analítica. Segmentado logicamente em schema (`raw_data`, `metrics`, `embeddings`), utiliza a extensão `pgvector` para buscas semânticas.
 
-#### Motor RAG e Inferência (Tempo Real)
+### Motor RAG e Inferência (Tempo Real)
 * 💻 **Streamlit UI (Motor Unificado)**: Ponto central de contato e orquestração.
 	* **Interface e Dashboard**: Captura a pergunta em linguagem natural e renderiza os DataFrames e gráficos dinâmicos.
 	* **Sentence-Transformers (Real-time)**: Gera o *embedding* da pergunta do usuário localmente (via CPU) para consulta ao banco.
@@ -107,6 +107,33 @@ graph LR
 	* **Ibis (Executor e Validador)**: Mantém uma conexão persistente (via `@st.cache_resource`) com o PostgreSQL. Executa o SQL gerado pelo RAG, valida a sintaxe e retorna os dados nativamente no formato **Apache Arrow**, evitando custos de conversão JSON.
 * 🧠 **Ollama (Motor de Inferência SLM)**: Serviço isolado que hospeda o modelo na GPU. Atua estritamente como um gerador de texto a partir dos prompts estruturados enviados pelo Streamlit.
 
+## 2.2. Tech Stack
+
+* **Gerenciamento**:
+	* [**UV**](https://docs.astral.sh/uv/): É um gerenciado de pacotes e instalador para Python extremamente rápido, escrito em Rust, projetado para substituir ferramentas como `pip`, `pip-tools` e `poetry` em um único executário.
+* **Orquestração**:
+	* [**Kedro**]([https://docs.kedro.org/en/stable/](https://docs.kedro.org/en/stable/getting-started/course/)): É um framework Python de código aberto que aplica princípios de engenharia de software - como modularidade, separação de conceitos e versionamento - à criação de pipelines de dados reproduzíveis e sustentáveis.
+	* [**Kedro-Viz**](https://docs.kedro.org/projects/kedro-viz/en/stable/): É uma ferramenta de visualização interativa que renderiza graficamente o Grafo Acíclico Direcionado (DAG) do seu projeto, permitindo rastrear a linhagem dos dados e a estrutura das tarefas.
+	* [**Kedro-Datasets**](https://docs.kedro.org/projects/kedro-datasets/en/kedro-datasets-9.2.0/): É um biblioteca de conectores curados que facilita a leitura e escrita de dados em diversos formatos (como CSV, Parquet e SQL) e sistemas de armazenamento (S3, Azure Blob, GCS) através de uma interface de configuração abstrata.
+* **Processamento**:
+	* [**Ibis**](https://ibis-project.org/): É um framework Python que oferece uma interface unificada e tipada para escrever consultas SQL complexas que podem ser executadas em múltiplos backends (como DuckDB e PostgreSQL) sem alterar o código.
+	* [**PyArrow**](https://arrow.apache.org/docs/python/): É a implementação em Python do Apache Arrow que fornece uma camada de memória coluna de alto desempenho para processamento e intercâmbio eficiente de grandes conjuntos de dados.
+* **Qualidade do Código**:
+	* [**Ruff**](https://docs.astral.sh/ruff/): É um *linter* e formatador de código Python extremamente rápido, escrito em Rust, que substitui dezenas de ferramentas tradicionais (como *Flake8* e *Black*) com performance superior.
+	* [**Ty**](https://docs.astral.sh/ty/#highlights): É um framework focado em **Type-Drive Development**, que simplifica a definição de tipos estáticos e validações em Python para aumentar a robustez do código.
+	* [**Pytest**](https://docs.pytest.org/en/stable/): O framework de testes padrão da indústria que facilita a escrita de testes unitários e de integração simples, escaláveis e altamente legíveis.
+* **Banco de Dados**:
+	* [**PostgreSQL**](https://www.postgresql.org/docs/): Banco de dados relacional de código aberto mais avançado do mundo, servindo como uma base extensível, confiável e robusto para qualquer tipo de carga de trabalho de dados.
+		* [**vchord (TensorChord)**](https://hub.docker.com/r/tensorchord/vchord-postgres): Um imagem Docker otimizada que combina o PostgreSQL com a extensão **pgvector**, focada em fornecer uma infraestrutura de alto desempenho para armazenamento e busca vetorial em aplicações de IA.
+		* [**PostGIS**](https://postgis.net/documentation/): Uma extensão espacial poderosa que adiciona suporte a objetos geográficos ao PostgreSQL, permitindo a execução de consultas de localização, mapeamento e análise geométrica complexa.
+		* [**TimescaleDB**](https://github.com/timescale/timescaledb?tab=readme-ov-file): Uma extensão que transforma o PostgreSQL em um banco de dados de séries temporais, utilizando "*hypertables*" para garantir ingestão rápida e consultas analíticas eficientes em dados temporais massivos.
+	* [**DuckDB**](https://duckdb.org/docs/stable/clients/python/overview): Um sistema de gerenciamento de banco de dados OLAP analítico e embutido (*in-process*), otimizado para consultas SQL extremamente rápidas em arquivos locais ou memória.
+	* [**ADBC (Arrow Database Connectivity)**](https://arrow.apache.org/adbc/current/index.html): 
+* **Modelos IA**:
+	* [**Sentence-Transformers**](https://huggingface.co/sentence-transformers): Uma biblioteca para gerar *embeddings* de texto de última geração, permitindo converter frases em vetores densos para busca semântica e RAG.
+		* [**all_MiniLM-L6-v2**](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2): É um modelo de *sentence embedding* extremamente leve e eficiente, ideal para converter textos em vetores densos de 384 dimensões em tarefas de busca semântica e RAG com baixo custo computacional.
+	* [**Ollama**](https://docs.ollama.com/): 
+		* [**qwen2.5-coder:1.5b**](): É um modelo de linguagem compacto e especializado em programação, treinado pela Alibaba para oferecer alta performance em geração de código e raciocínio lógico, sendo perfeito para execução local via Ollama.
 
 <br>
 
@@ -134,7 +161,7 @@ O projeto é dividido em dois ciclos operacionais distintos: o processamento em 
 2. **Carga no PostgreSQL via Custom Dataset (Ibis Upsert)**: O Kedro não possui um conector robusto para realizar operações de UPSERT nativas via Ibis no PostgreSQL. O desenvolvimento de um Custom Dataset garante que os dados em `raw_data` e as métricas geradas sejam inseridos de forma **idempotente**. Execuções repetidas do `run_job.sh` não duplicarão os registros.
 3. **Vetorização (Sentence-Transformers)**: Após a criação das métricas, os metadados (esquemas, descrições, dicionários de dados) são passados pelo cache do modelo local (configurado no `.env` via `HF_HOME`) e salvos no schema `embeddings` via `pgvector`.
 
-### Fase 2: Motor Analítico RAG (Tempo Real via API e UI)
+### Fase 2: Motor Analítico RAG
 
 1. **Input do Usuário**: O usuário envia uma pergunta na interface do Streamlit.
 2. **Vetorização Local**: O próprio backend persistente do Streamlit gera o _embedding_ da pergunta usando CPU.
@@ -149,7 +176,7 @@ O projeto é dividido em dois ciclos operacionais distintos: o processamento em 
 
 A camada de preparação de dados foi arquitetada sobre o framework **Kedro**, operando de forma efêmera e contêinerizada. Para garantir que o pipeline respeite as premissas de baixo consumo de recursos e alta performance, o comportamento padrão do Kedro foi estendido através de Hooks customizados e Custom Dataset do Kedro-datasets.
 
-### 5.1. Observabilidade e Monitoramento de Recursos (Hooks e Logging)
+## 5.1. Observabilidade e Monitoramento de Recursos (Hooks e Logging)
 
 Em ambientes contêinerizados com limites estritos de memória, vazamentos (*memory leaks*) na etapa de ETL podem derrubar o *Docker Host*. Para mitigar isso, implementamos:
 * **Logging Estruturado (`logging.yml`)**: Separação clara entre logs informativos e de erro, com rotatividade automática (`RotatingFileHandler` com backup limitado). Evita o inchaço do armazenamento local.
@@ -158,14 +185,14 @@ Em ambientes contêinerizados com limites estritos de memória, vazamentos (*mem
 	* Mede o delta de memória e o tempo de execução (em segundos).
 	* Dispara *flags* de alerta (`HIGH MEMORY`) no log caso um nó ultrapasse o limite seguro estipulado no `parameters.yml`. Isso permite identificar imediatamente transformações não-otimizadas.
 
-### 5.2. Otimização de Banco de Dados via Ciclo de Vida `CreateIndexesHook`
+## 5.2. Otimização de Banco de Dados via Ciclo de Vida `CreateIndexesHook`
 
 A manipulação de dados em massa (Bulk Load) em tabelas que possuem índices complexos — especialmente os índices vetoriais `HNSW` do *pgvector* — sofre de grave degradação de performance.
 Para resolver isso, o `CreateIndexesHook` altera o fluxo padrão de DDL (Data Definition Language):
 1. `before_pipeline_run`: Conecta ao PostgreSQL e executa os scripts DDL iniciais para garantir que as tabelas do schema `raw_data` existam (sem índices).
 2. `after_pipeline_run`: Apenas após toda a carga de dados ser finalizada, o hook executa a criação dos índices (B-Tree para métricas e HNSW para vetores). Criar índices sobre tabelas já populadas é mais rápido e eficiente do que atualizar o índice linha a linha durante o *Insert*.
 
-### 5.3. Ingestão de Alta Performance `IbisUpsertDataset`
+## 5.3. Ingestão de Alta Performance `IbisUpsertDataset`
 
 O gargalo de qualquer pipeline ETL moderno é a etapa de escrita no banco de dados. O Kedro nativo não oferece suporte eficiente para operações idempotentes de `UPSERT` usando Ibis. A classe `IbisUpsertDataset` foi criada combinando o padrão *Factory* com serialização em baixo nível.
 Como funciona:
@@ -174,13 +201,13 @@ Como funciona:
 3. **Carga em Memória (COPY)**: Usa a instrução `COPY FROM STDIN WITH (FORMAT BINARY)` para carregar os dados em uma tabela temporária quase instantaneamente.
 4. **Merge Inteligente (Upsert)**: Compara a tabela temporária com a tabela final, gerando dinamicamente um `ON CONFLICT DO UPDATE` que só sobrescreve o dado se houver diferença real (`IS DISTINCT FROM`). Isso reduz o I/O de disco e o inchaço do *Write-Ahead Log* (WAL).
 
-### 5.4. Catálogo Dinâmico e DRY `catalog.yml`
+## 5.4. Catálogo Dinâmico e DRY `catalog.yml`
 
 O Catálogo de Dados foi desenhado seguindo o princípio *DRY* (*Don't Repeat Yourself*).
 * **Padrões Dinâmicos (`{table}`)**: A sintaxe de fábrica (ex:`raw_{table}`) mapeia automaticamente qualquer arquivo `.parquet` na camada `01_raw` através da engine do DuckDB, eliminando mapeamentos manuais extensivos.
 * **YAML Anchors**: Configurações repetitivas (credenciais, uso da classe `IbisUpsertDataset`) são encapsuladas no *anchor* `&postgres_upsert_base`. Adicionar uma nova entidade exige apenas referenciar a base e definir o `table_name`.
 
-### 5.5. Pipeline de Processamento e Qualidade de Dados (`data_processing`)
+## 5.5. Pipeline de Processamento e Qualidade de Dados (`data_processing`)
 
 O pipeline de extração e transformação (`data_processing`) atua como a barreira de qualidade. Utiliza o **Ibis** para delegar a computação pesada ao DuckDB e ao PostgreSQL de forma vetorizada.
 
@@ -189,7 +216,7 @@ O pipeline de extração e transformação (`data_processing`) atua como a barre
 * `schema_rules.py`: Define contratos estritos de dados (regras de linha e estruturais).
 * `_validate_ibis_table`: Em vez de loops de validação custosos, compila todas as regras em um **único bloco de agregações Ibis**. Executa a query no banco/engine, abortando o pipeline com um `ValueError` detalhando caso qualquer regra retorne uma violação (`> 0`). Garante a política "Lixo não entra".
 
-#### B. Proteção de Integridade Referencial Dinâmica (Cross-Engine Joins)
+### B. Proteção de Integridade Referencial Dinâmica (Cross-Engine Joins)
 
 Para evitar quebras de pipeline por erros de chave estrangeira (FK), durante o `INSERT`:
 1. IDs validados do PostgreSQL são convertidos em `PyArrow` e carregados como `ibis.memtable` (tabela virtual em memória).
@@ -197,28 +224,48 @@ Para evitar quebras de pipeline por erros de chave estrangeira (FK), durante o `
 	* **Anti-Join**: Identifica e registra nos logs (como *warnings*) os registros órfãos.
 	* **Semi-Join**: Filtra a base original, enviando para o Upsert apenas as linhas com correspondência válida no banco destino.
 
-#### C. Estratégias de Carga Incremental
+### C. Estratégias de Carga Incremental
 
 Para manter a carga leve:
 * **Watermarking**: Tabelas de log (ex: `inventory_items`)consultam o destino para a data máxima inserida (`max(created_at)`), processando apenas registros novos.
 * **Moving Window**: Tabelas transacionais mutáveis (`orders` e `order_items`), usam um `lookback` configurável em dias, atualizando apenas pedidos recentes e ignorando históricos estáticos.
 
-#### D. Imutabilidade e Consistência Funcional
+### D. Imutabilidade e Consistência Funcional
 
 A lógica de transformação de negócio em `transform_tables.py` segue programação funcional (recebe `ibis.Table`, retorna `ibis.Table`).
 Para injetar as validações sem poluir a execução do Kedro, o utilitário `create_node_func` (`functools.partial`) aplica os contratos de esquema de forma transparente, garantindo que a observabilidade no `kedro-viz` e nos logs reflita as operações reais.
 
+## 5.6 Pipeline de Busca Semântica e Geo-Vetorização (`data_embeddings`)
 
-## Tech Stack
+Esta camada é responsável por transformar dados estruturados em representações vetoriais (embeddings) e espaciais (PostGIS), permitindo que o Agente RAG realize buscas semânticas e análises geográficas complexas.
 
-- **Gerenciamento**: `uv` (Astral)
-- **Orquestração**: Kedro + Kedro-Viz
-- **Processamento**: Ibis + PyArrow
-- **Qualidade de Código**: Ruff (Lint), Ty (Typing), Pytest (Testes)
-- **Banco de Dados**: PostgreSQL + pgvector + postGIS + TimescaleDB (via Docker), DuckDB
-- **Modelos AI**:
-  - *Embedding*: `all_MiniLM-L6-v2` (local)
-  - *SLM*: `deepseek-r1:1.5b` (via Ollama) (local)
+### A. Arquitetura de Inferência "Zero-Copy" com Polars
+
+Diferente do pipeline de ETL tradicional, a geração de embeddings exige alta densidade de processamento em memória. Implementamos um fluxo otimizado:
+1. **Extração via Arrow**: O Ibis extrai os dados do PostgreSQL/DuckDB diretamente para memória no formato Apache Arrow.
+2. **Materialização em Polars**: O dado é convertido para um DataFrame Polars sem cópia de memória desnecessária.
+3. **Inferência Batch**: Utilizamos o `SentenceTransformer` para processar a coluna `chunk_text` em lotes (batch size: 256), aproveitando a paralelização de CPU/GPU.
+4. **Tipagem de Vetores**: O resultado é injetado como um `pl.Array(pl.Float32, 384)`, garantindo compatibilidade binária exata com o `pgvector`.
+
+### B. Enriquecimento de Contexto Semântico (Chunks)
+
+Os nós de preparação (`prepare_nodes`) consolidam metadados espalhados em uma única string descritiva, otimizando a capacidade de recuperação do modelo:
+* **Produtos** Combina Nome, Marca, Categoria e Preço em uma narrativa técnica.
+* **Usuários (Logística Semântica)**: Realiza um join em tempo de execução para calcular o ticket médio por usuário e consolidar sua localização geográfica em uma descrição textual.
+
+### C. Ingestão de Alta Performance com ADBC (`PolarsVectorADBCDataset`)
+
+Para superar as limitações de latência do SQLAlchemy ao lidar com tipos complexos (`vector` e `geography`), desenvolvemos um dataset customizado baseado no driver **ADBC (Arrow Database Connectivity)**:
+1. **Staging Table**: O Polars descarrega o DataFrame em uma tabela temporária via protocolo binário Arrow.
+2. **Casting Dinâmico**: O dataset executa uma transação SQL que realiza o cast das strings para o formato `vector` (pgvector) e converte coordenadas `lat/long` no tipo `geography` do PostGIS de forma nativa.
+3. **Atomicidade**: Todo o processo de carga da staging para a produção ocorre dentro de uma transação única, garantindo a integridade dos dados mesmo em falhas.
+
+### D. Operações Geoespaciais (PostGIS & H3)
+
+Além dos vetores, o pipeline orquestra scripts SQL via `PostGISScriptsDataset` para:
+* **Map Hotspots (H3)***: Agregação de densidade de usuário utilizando indexação hierárquica hexagonal H3.
+* **User Logistics**: Cálculo de matrizes de distância entre centros de distribuição e usuários finais para métricas de eficiência logística.
+
 
 ## Estrutura do Repositório
 
@@ -263,7 +310,8 @@ Para injetar as validações sem poluir a execução do Kedro, o utilitário `cr
 │       ├── settings.py           # Configurações globais de execução do Kedro
 │       ├── utils/                # Funções utilitárias
 │       └── pipelines             # Pipelines de dados
-│           └── data_processing   # Extração, transformação e carga inicial
+│           ├── data_processing   # Extração, transformação e carga inicial
+│           └── data_embeddings   # Criação de tabelas de vetores para auxílio do RAG
 │
 ├── tests/                        # Testes unitários espelhando a estrutura do src/
 │   ├── datasets/                 # Testes dos custom datasets
@@ -369,10 +417,10 @@ Este planejamento foca nas entregas lógicas, sem datas fixas.
 
 ### Fase 3: Métricas, Vetores e AI
 
-- [ ] Implementar **Pipeline de Embeddings**:
-  - [ ] Node para gerar vetores de descrições de produtos.
-  - [ ] Criar testes com pelo menos 90% coverage
-  - [ ] Documentar no README.md
+- [X] Implementar **Pipeline de Embeddings**:
+  - [X] Node para gerar vetores de descrições de produtos.
+  - [X] Criar testes com pelo menos 90% coverage
+  - [X] Documentar no README.md
 - [ ] Implementar **Pipeline de Métricas**:
   - [ ] Node para criar tabelas de métricas
   - [ ] Criar testes com pelo menos 90% coverage

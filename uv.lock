@@ -3304,6 +3304,7 @@ wheels = [
 
 [[package]]
 name = "thelook-ecommerce-analysis"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "adbc-driver-postgresql" },
