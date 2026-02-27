@@ -45,7 +45,3 @@ SELECT
 FROM rfm_scores
 ORDER BY ltv DESC;
 */
-
-COMMENT ON VIEW analytics.customer_rfm IS 'Métricas de RFM (Recency, Frequency, Monetary) e segmentação de clientes. Use para análises de LTV, churn e valor do cliente.';
-COMMENT ON COLUMN analytics.customer_rfm.customer_segment IS 'Segmentação de negócio (ex: Champions, At Risk, Hibernating).';
-COMMENT ON COLUMN analytics.customer_rfm.ltv_value IS 'Lifetime Value (Receita total do cliente).';

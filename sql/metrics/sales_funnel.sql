@@ -28,7 +28,3 @@ FROM funil
 GROUP BY 1
 ORDER BY 1;
 */
-
-COMMENT ON VIEW analytics.sales_funnel IS 'Métricas de funil de conversão agregadas por ano. Acompanha a jornada do usuário desde a visualização até a compra e taxas de abandono.';
-COMMENT ON COLUMN analytics.sales_funnel.abandon_cart IS 'Taxa de abandono de carrinho (%). Usuários que adicionaram ao carrinho mas não compraram.';
-COMMENT ON COLUMN analytics.sales_funnel.drop_off IS 'Taxa de desistência (%). Usuários que viram um produto mas não adicionaram ao carrinho.';

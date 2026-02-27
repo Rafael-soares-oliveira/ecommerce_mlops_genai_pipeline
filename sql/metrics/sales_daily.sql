@@ -50,8 +50,3 @@ SELECT
 	returns_rate::numeric(5, 2)
 FROM final_metrics;
 */
-
-COMMENT ON VIEW analytics.daily_sales IS 'Métricas financeiras e logísticas agregadas por dia e país. Use para analisar GMV, receita, lucro bruto e taxas de conversão/perda.';
-COMMENT ON COLUMN analytics.daily_sales.gmv IS 'Volume Bruto de Mercadorias (vendas brutas). Exclui apenas pedidos cancelados.';
-COMMENT ON COLUMN analytics.daily_sales.net_revenue IS 'Receita Líquida real. Exclui pedidos cancelados e devolvidos.';
-COMMENT ON COLUMN analytics.daily_sales.gross_profit_realistic IS 'Lucro bruto considerando descontos de perdas logísticas (10% sobre o custo de devoluções).';

@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from kedro.pipeline import Pipeline
 
 from .pipelines.data_embeddings.pipeline import create_pipeline as data_embeddings
+from .pipelines.data_metrics.pipeline import create_pipeline as data_metrics
 from .pipelines.data_processing.pipeline import create_pipeline as data_processing
 
 
@@ -19,11 +20,13 @@ def register_pipelines() -> dict[str, Pipeline]:
     """
     dp = data_processing()
     de = data_embeddings()
+    dm = data_metrics()
 
-    full_pipeline = dp + de
+    full_pipeline = dp + de + dm
 
     return {
         "data_processing": dp,
         "data_embeddings": de,
+        "data_metrics": dm,
         "__default__": full_pipeline,
     }

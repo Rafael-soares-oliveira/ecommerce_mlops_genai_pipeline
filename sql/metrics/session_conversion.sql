@@ -21,7 +21,3 @@ FROM metrics
 GROUP BY 1
 ORDER BY MIN(duration_min);
 */
-
-COMMENT ON VIEW analytics.session_conversion IS 'Métricas de conversão de vendas agrupadas por tempo de duração da sessão do usuário.';
-COMMENT ON COLUMN analytics.session_conversion.session_duration_bucket IS 'Faixa de tempo da sessão (0-1 min, 1-5 min, 5-10 min, 10+ min).';
-COMMENT ON COLUMN analytics.session_conversion.conversion_rate IS 'Taxa de conversão em % de sessões que resultaram em compra.';

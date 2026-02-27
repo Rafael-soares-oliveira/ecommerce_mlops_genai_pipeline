@@ -23,6 +23,8 @@ _postgres_upsert_base: &postgres_upsert_base
   connection:
     backend: postgresql
     schema: raw_data
+  load_args:
+    database: raw_data
   metadata:
     kedro-viz:
       layer: Processing
@@ -40,6 +42,9 @@ primary_consult_inventory_items:
     mode: upsert
     global_config: ${globals:tables}
 
+# ===============================================================
+# 3. Embeddings (Vetorização)
+# ===============================================================
 embedding_model:
   type: thelook_ecommerce_analysis.datasets.sentence_transformers_model.SentenceTransformerDataset
   model_name: "all-MiniLM-L6-v2"
@@ -97,3 +102,24 @@ fct_vector_geo_search_embeddings:
   <<: *vector_geo_settings
   table_name: fct_vector_geo_search
   has_geo: true
+
+# ===============================================================
+# 4. Métricas
+# ===============================================================
+_postgres_metrics: &postgres_metrics
+  type: thelook_ecommerce_analysis.datasets.ibis_upsert_dataset.IbisUpsertDataset
+  credentials: postgres_ibis
+  connection:
+    backend: postgresql
+    schema: metrics
+  save_args:
+    materialized: table
+    mode: overwrite
+    database: metrics
+  metadata:
+    kedro-viz:
+      layer: Metrics
+
+metrics_{table_name}:
+  <<: *postgres_metrics
+  table_name: "{table_name}"

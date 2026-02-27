@@ -10,6 +10,7 @@ sql:
 indexes:
   data_processing: sql/raw_data/indexes.sql
   data_embedding: sql/embeddings/indexes.sql
+  data_metrics: sql/metrics/comments.sql
 
 order_lookback_days: 180 # 6 meses. Pedidos mais velhos que isso não são atualizados
 

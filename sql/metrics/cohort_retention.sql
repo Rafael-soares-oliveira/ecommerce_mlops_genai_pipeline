@@ -50,7 +50,3 @@ JOIN cohort_size s ON b.cohort_month = s.cohort_month AND b.country = s.country
 WHERE b.month_number <= 12
 ORDER BY 1, 2, 4;
 */
-
-COMMENT ON VIEW analytics.cohort_retention IS 'Análise de retenção de clientes por safra (cohort) e país. Use para analisar o engajamento ao longo dos meses.';
-COMMENT ON COLUMN analytics.cohort_retention.month_number IS 'Mês de vida da safra (0 é o mês da primeira compra, 1 é o mês seguinte, etc).';
-COMMENT ON COLUMN analytics.cohort_retention.retention_rate IS 'Taxa percentual de retenção (0 a 100).';

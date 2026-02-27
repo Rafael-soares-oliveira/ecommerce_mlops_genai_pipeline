@@ -176,6 +176,8 @@ O projeto é dividido em dois ciclos operacionais distintos: o processamento em 
 
 A camada de preparação de dados foi arquitetada sobre o framework **Kedro**, operando de forma efêmera e contêinerizada. Para garantir que o pipeline respeite as premissas de baixo consumo de recursos e alta performance, o comportamento padrão do Kedro foi estendido através de Hooks customizados e Custom Dataset do Kedro-datasets.
 
+<br>
+
 ## 5.1. Observabilidade e Monitoramento de Recursos (Hooks e Logging)
 
 Em ambientes contêinerizados com limites estritos de memória, vazamentos (*memory leaks*) na etapa de ETL podem derrubar o *Docker Host*. Para mitigar isso, implementamos:
@@ -185,12 +187,16 @@ Em ambientes contêinerizados com limites estritos de memória, vazamentos (*mem
 	* Mede o delta de memória e o tempo de execução (em segundos).
 	* Dispara *flags* de alerta (`HIGH MEMORY`) no log caso um nó ultrapasse o limite seguro estipulado no `parameters.yml`. Isso permite identificar imediatamente transformações não-otimizadas.
 
+<br>
+
 ## 5.2. Otimização de Banco de Dados via Ciclo de Vida `CreateIndexesHook`
 
 A manipulação de dados em massa (Bulk Load) em tabelas que possuem índices complexos — especialmente os índices vetoriais `HNSW` do *pgvector* — sofre de grave degradação de performance.
 Para resolver isso, o `CreateIndexesHook` altera o fluxo padrão de DDL (Data Definition Language):
 1. `before_pipeline_run`: Conecta ao PostgreSQL e executa os scripts DDL iniciais para garantir que as tabelas do schema `raw_data` existam (sem índices).
 2. `after_pipeline_run`: Apenas após toda a carga de dados ser finalizada, o hook executa a criação dos índices (B-Tree para métricas e HNSW para vetores). Criar índices sobre tabelas já populadas é mais rápido e eficiente do que atualizar o índice linha a linha durante o *Insert*.
+
+<br>
 
 ## 5.3. Ingestão de Alta Performance `IbisUpsertDataset`
 
@@ -201,11 +207,15 @@ Como funciona:
 3. **Carga em Memória (COPY)**: Usa a instrução `COPY FROM STDIN WITH (FORMAT BINARY)` para carregar os dados em uma tabela temporária quase instantaneamente.
 4. **Merge Inteligente (Upsert)**: Compara a tabela temporária com a tabela final, gerando dinamicamente um `ON CONFLICT DO UPDATE` que só sobrescreve o dado se houver diferença real (`IS DISTINCT FROM`). Isso reduz o I/O de disco e o inchaço do *Write-Ahead Log* (WAL).
 
+<br>
+
 ## 5.4. Catálogo Dinâmico e DRY `catalog.yml`
 
 O Catálogo de Dados foi desenhado seguindo o princípio *DRY* (*Don't Repeat Yourself*).
 * **Padrões Dinâmicos (`{table}`)**: A sintaxe de fábrica (ex:`raw_{table}`) mapeia automaticamente qualquer arquivo `.parquet` na camada `01_raw` através da engine do DuckDB, eliminando mapeamentos manuais extensivos.
 * **YAML Anchors**: Configurações repetitivas (credenciais, uso da classe `IbisUpsertDataset`) são encapsuladas no *anchor* `&postgres_upsert_base`. Adicionar uma nova entidade exige apenas referenciar a base e definir o `table_name`.
+
+<br>
 
 ## 5.5. Pipeline de Processamento e Qualidade de Dados (`data_processing`)
 
@@ -234,6 +244,8 @@ Para manter a carga leve:
 
 A lógica de transformação de negócio em `transform_tables.py` segue programação funcional (recebe `ibis.Table`, retorna `ibis.Table`).
 Para injetar as validações sem poluir a execução do Kedro, o utilitário `create_node_func` (`functools.partial`) aplica os contratos de esquema de forma transparente, garantindo que a observabilidade no `kedro-viz` e nos logs reflita as operações reais.
+
+<br>
 
 ## 5.6 Pipeline de Busca Semântica e Geo-Vetorização (`data_embeddings`)
 
@@ -266,6 +278,30 @@ Além dos vetores, o pipeline orquestra scripts SQL via `PostGISScriptsDataset` 
 * **Map Hotspots (H3)***: Agregação de densidade de usuário utilizando indexação hierárquica hexagonal H3.
 * **User Logistics**: Cálculo de matrizes de distância entre centros de distribuição e usuários finais para métricas de eficiência logística.
 
+<br>
+
+## 5.7 Pipeline de Geração de Métricas Analíticas (`data_metrics`)
+
+Este pipeline é responsável por consolidar os dados transformados em visões de negócios (*Data Marts*) padronizados, prontas para o consumo do painel interativo e consulta pelo Agente RAG.
+
+### A. Tabela de Métricas Geradas
+
+O pipeline processa e consolida as visões de negócio nas seguintes tabelas finais:
+* `metrics_sales_daily`: GMV, receita líquida, lucro, AOV e taxas de cancelamento/devolução diárias.
+* `metrics_customer_rfm_ltv`: Segmentação RFM, pontuação de clientes e *Lifetime Value* (LTV).
+* `metrics_cohort_retention`: Análise de retenção de usuários por safra em até 12 meses.
+* `metrics_products_performance`: Visão 360 do produto (taxa de devolução, tempo de envio, margem e *aging* de estoque).
+* `metrics_session_conversion`: Taxa de conversão agrupada por duração da sessão web.
+* `metrics_traffic_source_performance`: Aquisição, ordens e ticket médio por origem de tráfego.
+* `metrics_sales_funnel`: Funil de e-commerce anual (adição ao carrinho, compras, abandono e *drop-off*).
+
+### B. Wrapper de Observabilidade
+
+A função `create_metrics_tables` do `nodes.py` atua como um interceptador dinâmico. Ela envelopa a execução matemática do Ibis, garantindo log padronizado de início, captura de falhas em tempo de execução e emissão de alertas de sucesso, isolando a regra de negócio da lógica de monitoramento.
+
+### C. Execução Agnóstica com Ibis
+
+Todas as agregações complexas (RFM, LTV, Cohort, Funil de Conversão) são escritas inteiramente na sintaxe do Ibis (`ibis.Table`). Isso permite que as queries analíticas sejam enviadas diretamente ao PostgreSQL (*push-down*), mantendo alta performance.
 
 ## Estrutura do Repositório
 
@@ -291,7 +327,7 @@ Além dos vetores, o pipeline orquestra scripts SQL via `PostGISScriptsDataset` 
 │   ├── 07_model_output/          # Inferências e predições
 │   └── 08_reporting/             # Dados agregados para visualização
 │
-├── junit/                        # Relatórios de testes exportados pelo Pytest/GitHub Actions
+├── junit/                        # Relatórios de testes do Pytest
 ├── logs/                         # Arquivos de log locais
 ├── notebooks/                    # Rascunhos e experimentações (ignora no git)
 ├── pyproject.toml                # Configurações do projeto e ferramentas
@@ -311,7 +347,8 @@ Além dos vetores, o pipeline orquestra scripts SQL via `PostGISScriptsDataset` 
 │       ├── utils/                # Funções utilitárias
 │       └── pipelines             # Pipelines de dados
 │           ├── data_processing   # Extração, transformação e carga inicial
-│           └── data_embeddings   # Criação de tabelas de vetores para auxílio do RAG
+│           ├── data_embeddings   # Criação de tabelas de vetores para auxílio do RAG
+│           └── data_metrics      # Agregação e consolidação de métricas de negócio
 │
 ├── tests/                        # Testes unitários espelhando a estrutura do src/
 │   ├── datasets/                 # Testes dos custom datasets
@@ -362,35 +399,6 @@ bash run_job.sh
 * **Kedro-Viz (Lineage)**: `http://localhost:4141`
 * **pgAdmin**: `http://localhost:8080`
 
-## Tabelas de Métricas
-
-- **Métricas de Vendas e Receita**: Focada no desempenho financeiro.
-  - **Tabelas Fonte**: `order_items`, `orders`, `products`.
-  - **Métricas**:
-    - **GMV (Gross Merchandise Value)**: Soma total do valor das vendas (`sale_price`).
-    - **Ticket Médio (AOV)**: Média de gasto por pedido.
-    - **Taxa de Cancelamento**: % de pedidos com status `Cancelled`.
-- **Métricas de Clientes (CRM e Retenção)**: Focada no comportamento e valor do usuário ao longo do tempo.
-  - **Tabelas Fonte**: `users`, `orders`.
-  - **Métricas**:
-    - **LTV (Lifetime Value)**: Valor total gasto por usuário desde o cadastro.
-    - **Análise de Cohort**: Retenção de usuário agrupados pelo mês de aquisição (safra).
-    - **RFM (Recência, Frequência, Monetário)**: Segmentação de clientes para marketing.
-    - **Novos vs. Recorrentes**: Proporção de vendas de primeira compra vs. recompra.
-- **Métricas de Produto e Estoque**: Focada na logística e atratividade do item.
-  - **Tabelas Fonte**: `inventory_items`, `products`, `order_items`, `distribution_center`.
-  - **Métricas**:
-    - **Taxa de Devolução**: % de itens com status `Returned`.
-    - **Tempo de Envio**: Diferença entre `created_at` e `shipped_at`.
-    - **Margem de Produto**: Diferença entre `sale_price` e `cost`.
-    - **Aging do Estoque**: Tempo que os itens ficam no inventário antes da venda.
-- **Métricas de Navegação (Web Analytics)**: Focada no funil de conversão no site.
-  - **Tabelas Fonte**: `events`.
-  - **Métricas Possíveis**:
-    - **Taxa de Conversão de Sessão**: Visitantes únicos que compram / Total de visitantes.
-    - **Abandono de Carrinho**: Usuários que adicionam ao carrinho (`cart`) mas não compram (`purchase`).
-    - **Origem de Tráfego**: Análise da coluna `traffic_source`.
-
 ## Roadmap de Implementação (Planejamento)
 
 Este planejamento foca nas entregas lógicas, sem datas fixas.
@@ -421,10 +429,10 @@ Este planejamento foca nas entregas lógicas, sem datas fixas.
   - [X] Node para gerar vetores de descrições de produtos.
   - [X] Criar testes com pelo menos 90% coverage
   - [X] Documentar no README.md
-- [ ] Implementar **Pipeline de Métricas**:
-  - [ ] Node para criar tabelas de métricas
-  - [ ] Criar testes com pelo menos 90% coverage
-  - [ ] Documentar no README.md
+- [X] Implementar **Pipeline de Métricas**:
+  - [X] Node para criar tabelas de métricas
+  - [X] Criar testes com pelo menos 90% coverage
+  - [X] Documentar no README.md
 - [ ] Implementar **Pipeline de SLM Batch**:
   - [ ] Configurar modelo e contexto
   - [ ] Node que agrega métricas diárias.
@@ -432,7 +440,7 @@ Este planejamento foca nas entregas lógicas, sem datas fixas.
 
 ### Fase 4: Consumo e Visualização
 
-- [ ] Configurar API REST.
+- [ ] Configurar RAG.
 - [ ] Configurar Streamlit.
 - [ ] Cria dashboard modelo no Streamlit.
 - [ ] Criar Dashboard no Streamlit.
