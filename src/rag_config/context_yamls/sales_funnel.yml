@@ -1,0 +1,33 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: metrics.sales_funnel
+description: "Annual view of the conversion funnel and user browsing behavior."
+rules:
+  - "Funnel Shortcut: Always use this view for questions regarding cart abandonment, overall conversion rates, or drop-offs over the years to avoid recalculating from raw_data.events."
+columns:
+  year: "NUMERIC. Navigation year."
+  total_sessions: "BIGINT. Total web sessions in the year."
+  added_cart: "NUMERIC. Percentage of sessions that added an item to the cart."
+  purchased: "NUMERIC. Percentage of sessions that completed a purchase."
+  abandon_cart: "NUMERIC. Cart abandonment rate (0 to 100)."
+  drop_off: "NUMERIC. Post-product view drop-off rate (0 to 100)."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "What was the cart abandonment rate in 2026?"
+    sql: >
+      SELECT abandon_cart
+      FROM metrics.sales_funnel
+      WHERE year = 2026;
+    reasoning: "Direct query to the pre-calculated cart abandonment column filtered by year."
+
+  - question: "In which year did we have the highest percentage of completed purchases ('purchased')?"
+    sql: >
+      SELECT year, purchased
+      FROM metrics.sales_funnel
+      ORDER BY purchased DESC
+      LIMIT 1;
+    reasoning: "Orders the aggregated view by the purchase rate in descending order to find the top-performing year."

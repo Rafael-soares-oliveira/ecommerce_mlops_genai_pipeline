@@ -12,7 +12,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - pg_data:/var/lib/postgresql # Garantir acesso (precaução)
+      - pg_data:/var/lib/postgresql
       - ./sql/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro # Read Only
     ports:
       - "${POSTGRES_PORT}:5432"
@@ -25,6 +25,8 @@ services:
       resources:
         limits:
           memory: 2G # Modificar caso necessário
+        reservations:
+          memory: 1.5G
     command:
       - "postgres"
       - "-c"
@@ -55,11 +57,14 @@ services:
       - thelook-net
 
   pgadmin:
-    image: dpage/pgadmin4
+    image: dpage/pgadmin4:latest
     container_name: thelook_pgadmin
     restart: always
+    profiles:
+      - debug
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
@@ -71,6 +76,8 @@ services:
       resources:
         limits:
           memory: 500M
+        reservations:
+          memory: 300M
     networks:
       - thelook-net
 
@@ -78,6 +85,7 @@ services:
     image: ollama/ollama:latest
     container_name: ollama-service
     restart: unless-stopped
+    runtime: nvidia
     volumes:
       - ollama_storage:/root/.ollama
     networks:
@@ -86,8 +94,16 @@ services:
       - OLLAMA_KEEP_ALIVE=5m
       - OLLAMA_KV_CACHE_TYPE="q8_0"
       - OLLAMA_NUM_PARALLEL=1 # Evitar múltiplas requisições concorrentes
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
+        limits:
+          memory: 4G # Ajustar conforme o modelo utilizado
         reservations:
           devices:
             - driver: nvidia
@@ -100,16 +116,14 @@ services:
       dockerfile: Dockerfile.app
       args:
         EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME}
-    image: thelook-app-stack
+    image: thelook-app-stack:latest
     container_name: streamlit-ui
     restart: always
     depends_on:
       postgres:
         condition: service_healthy
-      ollama:
-        condition: service_started
     environment:
-      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_HOST_API: ${OLLAMA_HOST_API}
       POSTGRES_HOST: postgres
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -122,10 +136,18 @@ services:
       - "${STREAMLIT_PORT}:8501"
     networks:
       - thelook-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     deploy:
       resources:
         limits:
-          memory: 2G # Mudar caso necessário
+          memory: 3G # Mudar caso necessário
+        reservations:
+          memory: 2G
     command:
       ["uv", "run", "streamlit", "run", "src/app.py", "--server.address", "0.0.0.0"]
 
@@ -135,10 +157,13 @@ services:
       dockerfile: Dockerfile.app
       args:
         EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME}
-    image: thelook-app-stack
+    image: thelook-app-stack:latest
     container_name: kedro-viz-server
     profiles:
       - debug
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
       - .:/app
       - kedro_experiments_data:/app/.kedro
@@ -162,10 +187,13 @@ services:
       dockerfile: Dockerfile.app
       args:
         EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME}
-    image: thelook-app-stack
+    image: thelook-app-stack:latest
     container_name: kedro-job-runner
     profiles:
       - etl
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       HF_HOME: /app/model_cache
@@ -182,6 +210,7 @@ services:
       - ./sql/embeddings:/app/sql/embeddings:ro
     networks:
       - thelook-net
+    restart: no
     command: ["uv", "run", "kedro", "run"]
 
 volumes:

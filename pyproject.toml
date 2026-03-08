@@ -15,24 +15,33 @@ authors = [
 version = "0.1.0"
 dependencies = [
     "adbc-driver-postgresql>=1.10.0",
+    "altair>=6.0.0",
+    "charset-normalizer>=3.4.4",
     "connectorx>=0.4.5",
+    "httpx>=0.28.1",
     "ibis-framework[duckdb,postgres]>=11.0.0",
     "kedro>=1.2.0",
     "kedro-datasets>=9.1.1",
     "kedro-viz>=12.3.0",
+    "matplotlib>=3.10.8",
+    "ollama>=0.6.1",
     "pandas>=2.3.3",
     "pandera>=0.29.0",
     "pgpq>=0.11.0",
     "pgvector>=0.4.2",
+    "plotly>=6.5.2",
     "polars>=1.38.1",
     "psutil>=7.2.2",
     "psycopg[binary]>=3.3.2",
     "pyarrow>=23.0.0",
+    "pydeck>=0.9.1",
     "python-dotenv>=1.2.1",
+    "requests>=2.32.5",
     "shapely>=2.1.2",
     "sqlalchemy>=2.0.46",
-    "sqlglot[rs]>=28.10.1",
+    "sqlglot[c]>=28.10.1",
     "streamlit>=1.54.0",
+    "urllib3>=2.6.3",
 ]
 
 [dependency-groups]
@@ -118,7 +127,7 @@ classmethod-decorators = ["pydantic.validator", "declared_atrr"] #
 [tool.pytest.ini_options]
 minversion = "9.0"
 addopts = [
-    "--cov=src/thelook_ecommerce_analysis", # Irá cobrir apenas a pasta src
+    "--cov=src/", # Irá cobrir apenas a pasta src
     "--cov-report=term-missing", # Lista quais linhas exatas não foram testadas
     "--cov-report=xml", # Gera relatório em XML
     "--cov-report=html", # Gera relatório em HTML
@@ -140,7 +149,7 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["src/thelook_ecommerce_analysis"]
+source = ["src/"]
 branch = true
 omit = [
     "*/tests/*",
@@ -150,7 +159,8 @@ omit = [
     "*/conftest.py",
     "*/pipeline_registry.py",
     "*/__main__.py",
-    "*/__init__.py"
+    "*/__init__.py",
+    "src/streamlit_view/*"
 ]
 
 [tool.coverage.report]

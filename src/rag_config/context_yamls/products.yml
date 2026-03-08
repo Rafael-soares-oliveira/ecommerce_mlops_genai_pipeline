@@ -1,0 +1,43 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: raw_data.products
+description: "Product catalog. Essential for grouping orders and sales by category, brand, or department. Contains unified information about each product model."
+rules:
+  - "Differentiation: Use products for catalog-level analysis. Use inventory_items for physical stock/inventory analysis."
+  - "Textual Search (pg_trgm): The `name`, `brand`, and `category` columns have GIN trigram indices. Feel free to use partial search with `ILIKE '%term%'` as performance is optimized."
+  - "Exact Comparison: Unlike other tables, text columns here DO NOT have native case-insensitive collation. For strict equality, use LOWER()."
+columns:
+  id: "INTEGER. Primary key. Product model identifier."
+  cost: "NUMERIC(10,2). Standard product cost (> 0)."
+  category: "TEXT. Product category (e.g., 'Jeans', 'Accessories')."
+  name: "TEXT. Full name of the product model."
+  brand: "TEXT. Product brand."
+  retail_price: "NUMERIC(10,2). Final retail price to the consumer (>= 0)."
+  department: "TEXT. Department ('Men' or 'Women')."
+  sku: "TEXT. Unique product SKU code."
+  distribution_center_id: "SMALLINT. FK referencing `distribution_centers(id)`."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "What is the average retail price for 'Calvin Klein' brand products?"
+    sql: >
+      SELECT AVG(retail_price) FROM raw_data.products
+      WHERE LOWER(brand) = 'calvin klein';
+    reasoning: "Applies `LOWER()` to the brand column and the search value since the table lacks native case-insensitive collation."
+
+  - question: "How many different products exist in the 'Jeans' category for the men's department?"
+    sql: >
+      SELECT count(*) FROM raw_data.products
+      WHERE LOWER(category) = 'jeans' AND LOWER(department) = 'men';
+    reasoning: "Counts records in the product catalog using `LOWER()` on text columns to ensure correct matching."
+
+  - question: "Which are the 5 most expensive products (highest retail price) associated with distribution center 1?"
+    sql: >
+      SELECT id, name, retail_price FROM raw_data.products
+      WHERE distribution_center_id = 1
+      ORDER BY retail_price DESC
+      LIMIT 5;
+    reasoning: "Filters by the DC ID and orders by retail price in descending order, limiting the result to the top 5."

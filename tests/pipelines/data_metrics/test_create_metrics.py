@@ -1,7 +1,6 @@
 import ibis
 import pandas as pd
 import pytest
-from pytest_mock import MockerFixture
 
 from thelook_ecommerce_analysis.pipelines.data_metrics.metrics.customer_metrics import (
     cohort_retention,
@@ -36,6 +35,7 @@ def users_table() -> ibis.Table:
 def order_items_table() -> ibis.Table:
     df = pd.DataFrame(
         {
+            "id": [1, 2, 3, 4],
             "order_id": [10, 11, 12, 13],
             "user_id": [1, 1, 2, 3],
             "product_id": [100, 101, 100, 102],
@@ -118,27 +118,29 @@ def test_cohort_retention(users_table: ibis.Table, order_items_table: ibis.Table
 
 
 def test_product_360(
-    mocker: MockerFixture,
     order_items_table: ibis.Table,
     products_table: ibis.Table,
     inventory_items_table: ibis.Table,
 ):
-    # Usando pytest-mock para congelar ibis.now() e garantir aging determinístico
-    mock_now = mocker.patch(
-        "thelook_ecommerce_analysis.pipelines.data_metrics.metrics.product_360.ibis.now"
-    )
-    mock_now.return_value = ibis.literal("2023-05-01 00:00:00").cast("timestamp")
-
+    # Executa a função
     result = product_360(
         order_items_table, products_table, inventory_items_table
     ).execute()
 
+    # 1. Validações de Estrutura
     assert not result.empty
-    assert "avg_margin_pct" in result.columns
+    assert "inventory_turnover" in result.columns
     assert "stock_qt" in result.columns
+    assert "days_since_last_sale" in result.columns
 
+    # 2. Validação de Lógica de Negócio (Exemplo: Prod1)
     prod1 = result[result["product_name"] == "Prod1"].iloc[0]
-    assert prod1["return_rate_pct"] >= 0
+
+    assert prod1["stock_qt"] == 1  # No fixture, item id 1 é do prod 100 e sold_at é NaT
+    assert prod1["aov"] == 75.0  # (50.0 + 100.0) / 2
+
+    # 3. Validação de Datas (snapshot_date será 2023-03-01 conforme o fixture)
+    assert prod1["days_since_last_sale"] >= 28
 
 
 def test_daily_sales_and_revenue(

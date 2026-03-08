@@ -1,0 +1,44 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: raw_data.users
+description: "User demographic data. Use to filter by location, age, or traffic source."
+rules:
+  - "Do not perform direct mathematical calculations with latitude and longitude. For any spatial distance calculation, it is mandatory to use the user_geom column with PostGIS functions (e.g., ST_DWithin)."
+  - "The state, city, and country columns have case-insensitive collation. Do not apply LOWER() or UPPER() to them."
+columns:
+  id: "INTEGER. Primary key."
+  age: "SMALLINT. Age in years (> 0)."
+  gender: "TEXT. Strict allowed values: 'M', 'F', 'Others'."
+  state: "TEXT. State name."
+  city: "TEXT. City name."
+  country: "TEXT. Country name."
+  latitude: "DOUBLE PRECISION. Y-axis (-90 to 90)."
+  longitude: "DOUBLE PRECISION. X-axis (-180 to 180)."
+  traffic_source: "TEXT. Acquisition channel (e.g., 'organic', 'paid_search')."
+  created_at: "TIMESTAMPZ. Registration date and time."
+  context_summary: "TEXT. Textual summary of the user profile. Ideal for semantic search and similarity."
+  user_geom: "GEOGRAPHY(POINT, 4326). Spatial location. Use PostGIS functions like ST_DWithin for distance calculations."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "How many female users over 30 years old live in São Paulo?"
+    sql: >
+      SELECT count(*) FROM raw_data.users
+      WHERE gender = 'F' AND age > 30 AND city = 'São Paulo';
+    reasoning: "Uses exact gender constraints. LOWER() is not applied to 'city' as the collation is already case-insensitive."
+
+  - question: "Find the IDs of users within a 10km radius of the coordinate (latitude -23.5, longitude -46.6)."
+    sql: >
+      SELECT id FROM raw_data.users
+      WHERE ST_DWithin(user_geom, ST_SetSRID(ST_MakePoint(-46.6, -23.5), 4326)::geography, 10000);
+    reasoning: "Uses the generated user_geom column and ST_DWithin for spatial calculation in meters. ST_MakePoint requires the order (longitude, latitude)."
+
+  - question: "List 5 users who came from organic search ('organic') in 2026."
+    sql: >
+      SELECT id, age, city FROM raw_data.users
+      WHERE traffic_source = 'organic' AND EXTRACT(YEAR FROM created_at) = 2026
+      LIMIT 5;
+    reasoning: "Filters by the traffic source string and extracts the year from the TIMESTAMPZ column."

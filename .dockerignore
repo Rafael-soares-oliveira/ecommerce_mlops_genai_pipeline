@@ -1,4 +1,6 @@
-# --- Data e Logs ---
+# ============================================
+# Data and Logs (exclude entirely)
+# ============================================
 data/
 logs/*
 !logs/.gitkeep
@@ -6,24 +8,86 @@ logs/*
 .pytest_cache/
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
 
-# --- Configurações Locais e Segredos ---
-# conf/local/
-.env
-
-# --- Arquivos de Desenvolvimento e Testes ---
+# ============================================
+# Development and Testing (exclude entirely)
+# ============================================
 tests/
+test_*.py
+*_test.py
 notebooks/
 docs/
+.ipynb_checkpoints/
+
+# ============================================
+# Version Control and CI/CD (exclude entirely)
+# ============================================
 .git/
+.gitignore
 .github/
-.venv
+.gitlab-ci.yml
+.gitattributes
 
-# --- Scripts de Infraestrutura ---
-*.sh
-!run_job.sh
-docker-compose.yml
+# ============================================
+# IDE and Editor Files (exclude entirely)
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.vim
+*~
+.DS_Store
+.env.local
+.env.*.local
+
+# ============================================
+# Python Virtual Environments (exclude entirely)
+# ============================================
+venv/
+.venv/
+env/
+.env
+
+# ============================================
+# Security and Secrets (exclude entirely)
+# ============================================
+.env*
+!.env.example
+*.pem
+*.key
+secrets/
+.ssh/
+
+# ============================================
+# Temporary and Cache Files (exclude entirely)
+# ============================================
+*.tmp
+*.bak
+*.temp
+.cache/
+tmp/
+temp/
+
+# ============================================
+# Docker Files (not needed in image)
+# ============================================
 Dockerfile
-Dockerfile.app
+Dockerfile.*
+docker-compose*.yml
+.dockerignore
 
-requirements.txt
+# ============================================
+# Build Artifacts (exclude entirely)
+# ============================================
+*.o
+*.so
+*.la
+*.a
+*.dylib
+*.dll
+*.exe

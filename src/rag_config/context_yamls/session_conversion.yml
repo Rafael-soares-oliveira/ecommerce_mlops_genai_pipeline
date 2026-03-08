@@ -1,0 +1,32 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: metrics.session_conversion
+description: "E-commerce conversion rate aggregation based on browsing time (session duration)."
+rules:
+  - "Conversion Shortcut: Use this table directly for questions about how time spent on the site impacts sales. Avoid recalculating durations from the raw_data.events table."
+  - "Bucket Filters: The session_duration_bucket column contains fixed text values ('0-1 min', '1-5 min', '5-10 min', '10+ min')."
+columns:
+  session_duration_bucket: "TEXT. Session duration range."
+  total_sessions: "BIGINT. Total number of sessions within this time range."
+  total_sales: "BIGINT. Number of sessions that included at least one 'purchase' event."
+  conversion_rate: "NUMERIC. Conversion rate as a percentage (0 to 100)."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "Which session duration range has the highest conversion rate?"
+    sql: >
+      SELECT session_duration_bucket, conversion_rate
+      FROM metrics.session_conversion
+      ORDER BY conversion_rate DESC
+      LIMIT 1;
+    reasoning: "Orders the aggregated table directly by the conversion rate and returns the top result."
+
+  - question: "How many sales came from users who spent less than 1 minute on the site?"
+    sql: >
+      SELECT total_sales
+      FROM metrics.session_conversion
+      WHERE session_duration_bucket = '0-1 min';
+    reasoning: "Filters by the exact string corresponding to the 'less than 1 minute' bucket."

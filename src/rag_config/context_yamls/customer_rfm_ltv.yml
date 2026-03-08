@@ -1,0 +1,34 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: metrics.customer_rfm_ltv
+description: "Consolidated customer metrics using the RFM (Recency, Frequency and Monetary Value) methodology."
+rules:
+  - "Segment Filters: Use the `customer_segment' column for exact string searches regarding customer behavior (e.g., 'Champions (VIP)', 'At Risk (High Value)')."
+  - "LTV: The customer's historical monetary value (revenue) is stored in the `ltv_value` column."
+columns:
+  user_id: "INTEGER. Unique customer identifier."
+  recency_days: "INTEGER. Days elapsed since the last purchase."
+  frequency_count: "INTEGER. Total number of unique orders placed."
+  ltv_value: "NUMERIC(10,2). Total lifetime spend by the customer."
+  rfm_score: "TEXT. Concatenation of score (e.g., '555' for the best customer)."
+  r_score: "INTEGER. Recency score (1 to 5)."
+  f_score: "INTEGER. Frequency score (1 to 5)."
+  m_score: "INTEGER. Monetary value score (1 to 5)."
+  customer_segment: "TEXT. Nominal customer classification based on RFM."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "How many customers do we have in the 'Champions (VIP)'?"
+    sql: >
+      SELECT COUNT(*) FROM metrics.customer_rfm_ltv
+      WHERE customer_segment = 'Champions (VIP)';
+    reasoning: "Calculates the mean of the `ltv_value` column for the specified segment."
+
+  - question: "What is the average LTV for customer flagged as 'At Risk (High Value)'?"
+    sql: >
+      SELECT AVG(ltv_value) FROM metrics.customer_rfm_ltv
+      WHERE customer_segment = 'At Risk (High Value)';
+    reasoning: "Calculates the mean of the `ltv_value` column for the specified segment."

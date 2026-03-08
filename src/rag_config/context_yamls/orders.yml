@@ -1,0 +1,44 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: raw_data.orders
+description: "Master orders table. Records the logistics lifecycle and status of every purchase made by a user."
+rules:
+  - "Status values are case-sensitive. Use exactly: 'Processing', 'Shipped', 'Complete', 'Returned', or 'Cancelled'."
+  - "To calculate delivery time, find the difference between delivered_at and created_at or shipped_at, depending on the specific business rule required."
+columns:
+  order_id: "INTEGER. Primary key. Unique order identifier."
+  user_id: "INTEGER. Foreign key referencing `raw_data.users(id)`."
+  status: "TEXT. Current purchase state."
+  created_at: "TIMESTAMPTZ. Date and time of order creation."
+  returned_at: "TIMESTAMPTZ. Return date (if applicable)."
+  shipped_at: "TIMESTAMPTZ. Shipping/dispatch date."
+  delivered_at: "TIMESTAMPTZ. Date of delivery to the customer."
+  num_of_item: "SMALLINT. Number of items contained in the order (> 0)."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "How many orders were 'Cancelled' in 2026?"
+    sql: >
+      SELECT count(*) FROM raw_data.orders
+      WHERE status = 'Cancelled' AND EXTRACT(YEAR FROM created_at) = 2026;
+    reasoning: "Filters by status using exact capitalization and extracts the year from the creation date."
+
+  - question: "What is the average time (in days) between creation and delivery for 'Complete' orders?"
+    sql: >
+      SELECT AVG(EXTRACT(EPOCH FROM (delivered_at - created_at)) / 86400) AS avg_delivery_days
+      FROM raw_data.orders
+      WHERE status = 'Complete' AND delivered_at IS NOT NULL;
+    reasoning: "Calculates the difference between timestamps, extracts total seconds with EPOCH, and divides by 86400 to convert to days. Filters for completed orders."
+
+  - question: "List the IDs of the top 5 users with the highest number of 'Returned' orders."
+    sql: >
+      SELECT user_id, COUNT(order_id) AS total_returned
+      FROM raw_data.orders
+      WHERE status = 'Returned'
+      GROUP BY user_id
+      ORDER BY total_returned DESC
+      LIMIT 5;
+    reasoning: "Filters for 'Returned' status, groups by user, and orders descending by the count of returns."

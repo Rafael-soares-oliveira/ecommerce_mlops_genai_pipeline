@@ -1,0 +1,71 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: raw_data.events
+description: "Navigation events (clickstream). Records step-by-step user interactions on the website."
+rules:
+  - "Hypertable TimescaleDB: This table is time-partitioned. It is MANDATORY to include a time-range filter on the `created_at` column (e.g., `created_at >= '2026-02-01'`) to prevent full table scans."
+  - "Sessions: Group sequential behavior using `session_id`. Order steps by `sequence_nubmer` or `created_at`."
+  - "Textual Filters: `city` and `state` have native case-insensitive collation. Do not apply `LOWER()` or `UPPER()`."
+  - "Anonymous Users: The `user_id` column can be NULL."
+columns:
+  id: "INTEGER. Part of PK. Event identifier."
+  user_id: "INTEGER. FK referencing raw_data.users(id). Can be NULL."
+  sequence_number: "INTEGER. Chronological order of the event within a session."
+  session_id: "TEXT. Grouping identifier for the web session."
+  created_at: "TIMESTAMPTZ. Part of PK. Date and time of the event."
+  ip_address: "TEXT. Device ID address. Only for identify unique device, DO NOT show in a query."
+  city: "TEXT. City mapped from the IP."
+  state: "TEXT. State mapped from the IP."
+  postal_code: "TEXT. Postal code."
+  browser: "TEXT. Browser used."
+  traffic_source: "TEXT. Traffic source origin."
+  uri: "TEXT. Accessed URL path."
+  event_type: "TEXT. Action type ('product', 'department', 'cart', 'purchase', 'cancel', 'home')."
+  visitor_type: "TEXT. Visitor classification."
+  extracted_product_id: "INTEGER. FK referencing products(id) extracted from navigation."
+  extracted_page_type: "TEXT. Page classification extracted from the URI."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "How many unique sessinos resulted in a 'purchase'?"
+    sql: >
+      SELECT COUNT(DISTINCT session_id)
+      FROM raw_data.events
+      WHERE event_type = 'purchase';
+    reasoning: "Counts unique session identifiers by specifically filtering for the purchase completion event."
+
+  - question: "What was the most viewed product ID ('product' event) in February 2026?"
+    sql: >
+      SELECT extracted_product_id, COUNT(*) as views
+      FROM raw_data.events
+      WHERE event_type = 'product'
+        AND extracted_product_id IS NOT NULL
+        AND created_at >= '2026-02-01' AND created_at < '2026-03-01'
+      GROUP BY extracted_product_id
+      ORDER BY views DESC
+      LIMIT 1;
+    reasoning: "Filters by view event, uses time partitioning (`created_at`) to optimize the query, groups by extracted ID, and orders by view count."
+
+  - question: "How many events originated from Rio de Janeiro traffic?"
+    sql: >
+      SELECT COUNT(*)
+      FROM raw_data.events
+      WHERE state = 'Rio de Janeiro';
+    reasoning: "Direct search on the `state` column without case handling, as the collation is already case-insensitive."
+
+  - question: "What is the conversion rate from product view ('product') to cart addition ('cart') for sessions in February 2026?"
+    sql: >
+      WITH session_counts AS (
+      SELECT
+        COUNT(DISTINCT CASE WHEN event_type = 'product' THEN session_id END) as product_views,
+        COUNT(DISTINCT CASE WHEN event_type = 'cart' THEN session_id END) as cart_adds
+      FROM raw_data.events
+      WHERE created_at >= '2026-02-01' AND created_at < '2026-03-01'
+      )
+      SELECT
+        (cart_adds::float / NULLIF(product_views, 0)) * 100 as conversion_rate
+      FROM session_counts;
+    reasoning: "Calculates the percentage of sessions that included a cart event out of those that included a product view, using conditional counting and time partitioning."

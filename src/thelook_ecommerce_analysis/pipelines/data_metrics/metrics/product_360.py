@@ -4,104 +4,87 @@ import ibis
 def product_360(
     order_items: ibis.Table, products: ibis.Table, inventory_items: ibis.Table
 ) -> ibis.Table:
-    """
-    Calculates products 360 view.
+    # 0. Data de referência (Snapshot para simular CURRENT_DATE)
+    ref_date = order_items.aggregate(snapshot_date=order_items.created_at.max())
 
-    SQL:
-        >>>
-        with sales_metrics as (
-            select
-                oi.product_id,
+    # 1. Filtro base
+    oi_filtered = order_items.filter(
+        [order_items.status != "Cancelled", order_items.created_at.notnull()]
+    )
 
-                -- Taxa de Devolução (Itens devolvidos / Total Itens Entregues ou Completos -> desconsiderado 'Processing' e 'Cancelled')
-                (
-                    count(case when oi.status = 'Returned' then 1 end)::numeric /
-                    nullif(count(case when oi.status in ('Complete', 'Returned', 'Shipped') then 1 end), 0)
-                ) as return_rate,
-
-                -- Tempo de Envio: extrai os segundos e converte para dias (86400s = 24h)
-                avg(extract(epoch from (oi.shipped_at - oi.created_at))/86400) as avg_to_shipping_days,
-
-                -- Average Ticket (AOV)
-                avg(oi.sale_price) as aov
-            from raw_data.order_items oi
-            join raw_data.products p on oi.product_id = p.id
-            where oi.status not in ('Cancelled')
-            group by 1
-        ),
-        stock_metrics as (
-            select
-                ii.product_id,
-
-                -- Aging do Estoque (Média de dias dos itens parados(não vendidos))
-                avg(current_date - ii.created_at::date) as avg_aging_days,
-                count(*) as stock_qt
-            from raw_data.inventory_items ii
-            where ii.sold_at is null -- Não vendido
-            group by 1
-        )
-        select
-            p.category,
-            p.name as product_name,
-            round(sa.return_rate * 100, 2) as return_rate_pct,
-            round(sa.avg_to_shipping_days::numeric, 2) as avg_to_shipping_days,
-            round(
-                ((sa.aov - p.cost) / nullif(sa.aov, 0)) * 100, 2
-            ) as avg_margin_pct,
-            round(sa.aov, 2) as aov,
-            round(st.avg_aging_days, 2) as avg_aging_days,
-            coalesce(stock_qt, 0) as stock_qt
-        from raw_data.products p
-        left join sales_metrics sa on p.id = sa.product_id
-        left join stock_metrics st on p.id = st.product_id
-        order by avg_aging_days desc;
-    """
-    # 1. Sales Metrics
-    # Filtro inicial - Remover itens cancelados
-    oi = order_items.filter(order_items.status != "Cancelled")
+    # 2. Sales Metrics
     valid_status = ["Complete", "Returned", "Shipped"]
 
-    # Join com produtos para obter o custo
-    sales_agg = oi.group_by("product_id").aggregate(
+    sales_agg = oi_filtered.group_by(
+        ["product_id", oi_filtered.created_at.year().name("sales_year")]
+    ).aggregate(
+        total_units_sold=oi_filtered["id"].count(),
+        total_revenue=oi_filtered.sale_price.sum(),
         return_rate=(
-            (oi.status == "Returned").ifelse(1, 0).sum()
-            / (oi.status.isin(valid_status)).ifelse(1, 0).sum().nullif(0)
+            (oi_filtered.status == "Returned").ifelse(1, 0).sum().cast("float64")
+            / (oi_filtered.status.isin(valid_status)).ifelse(1, 0).sum().nullif(0)
         ),
-        # Converte para segundos e depois para horas e dividi por 24horas (86400 == 24horas)
         avg_to_shipping_days=(
-            (oi.shipped_at.epoch_seconds() - oi.created_at.epoch_seconds()).mean()
+            (
+                oi_filtered.shipped_at.epoch_seconds()
+                - oi_filtered.created_at.epoch_seconds()
+            ).mean()
             / 86400
         ),
-        aov=oi.sale_price.mean(),
+        aov=oi_filtered.sale_price.mean(),
+        last_sale_date=oi_filtered.created_at.max(),
     )
 
-    # 2. Stock Metrics
-    ii = inventory_items.filter(inventory_items.sold_at.isnull())
-
-    stock_agg = ii.group_by("product_id").aggregate(
-        avg_aging_days=(
-            ibis.now().epoch_seconds() - ii.created_at.epoch_seconds()
-        ).mean()
-        / 86400,
-        stock_qt=ii.count(),
+    # 3. Inventory Stats
+    inventory_stats = inventory_items.group_by("product_id").aggregate(
+        turnover_ratio=(
+            inventory_items.sold_at.count().cast("float64")
+            / (inventory_items.sold_at.isnull()).ifelse(1, 0).sum().nullif(0)
+        ),
+        avg_days_to_sell=(
+            (
+                inventory_items.sold_at.epoch_seconds()
+                - inventory_items.created_at.epoch_seconds()
+            ).mean()
+            / 86400
+        ),
+        current_stock=(inventory_items.sold_at.isnull()).ifelse(1, 0).sum(),
     )
 
-    # 3. Joins e Cálculos finais
-    result = products.left_join(
-        sales_agg, products.id == sales_agg.product_id
-    ).left_join(stock_agg, products.id == stock_agg.product_id)
+    # 4. Joins
+    # Usamos o prefixo para evitar colisão de colunas 'id' e 'product_id'
+    result = products.join(sales_agg, products["id"] == sales_agg.product_id).left_join(
+        inventory_stats, products["id"] == inventory_stats.product_id
+    )
 
+    # Cross join com a data de referência
+    result = result.cross_join(ref_date)
+
+    # 5. Projeção Final
     final_df = result.select(
-        category=products.category,
-        product_name=products.name,
+        product_id=result["id"],
+        sales_year=result.sales_year,
+        category=result.category,
+        product_name=result.name,
+        total_units_sold=result.total_units_sold,
+        total_revenue=result.total_revenue.round(2),
+        avg_shipping_days=result.avg_to_shipping_days.round(1),
+        # Diferença de tempo convertida para dias
+        days_since_last_sale=(
+            (
+                result.snapshot_date.epoch_seconds()
+                - result.last_sale_date.epoch_seconds()
+            )
+            / 86400
+        ).cast("int64"),
+        stock_qt=result.current_stock.fillna(0),
+        inventory_turnover=result.turnover_ratio.round(2),
+        avg_days_to_sell=result.avg_days_to_sell.round(2),
         return_rate_pct=(result.return_rate * 100).round(2),
-        avg_to_shipping_days=result.avg_to_shipping_days.round(2),
         avg_margin_pct=(
-            ((result.aov - products.cost) / result.aov.nullif(0)) * 100
+            ((result.aov - result.cost) / result.aov.nullif(0)) * 100
         ).round(2),
         aov=result.aov.round(2),
-        avg_aging_days=result.avg_aging_days.round(2),
-        stock_qt=ibis.coalesce(result.stock_qt, 0),
-    ).order_by(ibis.desc("avg_aging_days"))
+    ).order_by([ibis.desc("sales_year"), ibis.desc("total_revenue")])
 
     return final_df

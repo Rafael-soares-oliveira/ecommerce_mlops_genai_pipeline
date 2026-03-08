@@ -15,10 +15,12 @@ COMMENT ON COLUMN metrics.sales_daily.net_revenue IS 'Receita Líquida real. Exc
 COMMENT ON COLUMN metrics.sales_daily.gross_profit_realistic IS 'Lucro bruto considerando descontos de perdas logísticas (10% sobre o custo de devoluções).';
 
 -- PRODUCT PERFORMANCE
-COMMENT ON TABLE metrics.products_performance IS 'Visão consolidada de performance de produtos. Une métricas de vendas (margem, devolução, ticket médio) com saúde de estoque (aging e quantidade).';
-COMMENT ON COLUMN metrics.products_performance.avg_aging_days IS 'Média de dias que o estoque do produto está parado (sem vender).';
-COMMENT ON COLUMN metrics.products_performance.avg_margin_pct IS 'Margem de lucro média em percentual (AOV - Custo / AOV).';
-COMMENT ON COLUMN metrics.products_performance.return_rate_pct IS 'Taxa percentual de devolução do produto.';
+COMMENT ON TABLE metrics.products_performance IS 'Visão consolidada de performance: une vendas (margem, devolução, ticket médio) e inventário (giro, tempo de venda e estoque atual).';
+
+COMMENT ON COLUMN metrics.products_performance.inventory_turnover IS 'Giro de estoque: Razão entre itens vendidos e estoque atual. Valores altos indicam alta rotatividade.';
+COMMENT ON COLUMN metrics.products_performance.avg_days_to_sell IS 'Média de dias que um item levou em estoque antes de ser vendido (histórico).';
+COMMENT ON COLUMN metrics.products_performance.days_since_last_sale IS 'Dias decorridos desde a última venda realizada deste produto.';
+COMMENT ON COLUMN metrics.products_performance.avg_margin_pct IS 'Margem de lucro média calculada como ((Preço de Venda - Custo) / Preço de Venda) * 100.';
 
 -- SALES FUNNEL
 COMMENT ON TABLE metrics.sales_funnel IS 'Métricas de funil de conversão agregadas por ano. Acompanha a jornada do usuário desde a visualização até a compra e taxas de abandono.';

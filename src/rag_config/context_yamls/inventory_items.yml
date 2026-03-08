@@ -1,0 +1,45 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: raw_data.inventory_items
+description: "Individual items in inventory. Each record represents a physical unit of a product."
+rules:
+  - "Available Stock: To filter items that haven't been sold yet (in stock), ALWAYS use the condition sold_at IS NULL."
+  - "Margin Calculation: Item profit is calculated as (product_retail_price - cost)."
+  - "The columns category, name, brand, and department have case-insensitive collation. Do not apply LOWER() or UPPER()."
+columns:
+  id: "INTEGER. Primary key. Unique identifier for the physical item."
+  product_id: "INTEGER. Product model identifier."
+  created_at: "TIMESTAMPTZ. Date the item entered inventory."
+  sold_at: "TIMESTAMPTZ. Sale date. NULL means the item is still in stock."
+  cost: "NUMERIC(10,2). Acquisition cost of the item (>= 0)."
+  product_category: "TEXT. Product category (e.g., 'Jeans', 'Accessories')."
+  product_name: "TEXT. Full name of the product."
+  product_brand: "TEXT. Product brand."
+  product_retail_price: "NUMERIC(10,2). Final retail price to the consumer (>= 0)."
+  product_department: "TEXT. Department ('Men' or 'Women')."
+  product_sku: "TEXT. Product SKU code."
+  product_distribution_center_id: "INTEGER. FK referencing `distribution_centers(id)`."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "How many 'Nike' brand items are currently available in stock?"
+    sql: >
+      SELECT count(*) FROM raw_data.inventory_items
+      WHERE product_brand = 'Nike' AND sold_at IS NULL;
+    reasoning: "Filters by brand (ignoring case sensitivity) and requires sold_at IS NULL to ensure the item is still in inventory."
+
+  - question: "What is the total cost value of stagnant stock items at distribution center 3?"
+    sql: >
+      SELECT SUM(cost) FROM raw_data.inventory_items
+      WHERE product_distribution_center_id = 3 AND sold_at IS NULL;
+    reasoning: "Sums the cost column, filtering by DC ID and ensuring the items are still in stock (sold_at IS NULL)."
+
+  - question: "What is the average profit margin for products in the 'Women' department that have already been sold?"
+    sql: >
+      SELECT AVG(product_retail_price - cost) AS avg_margin
+      FROM raw_data.inventory_items
+      WHERE product_department = 'Women' AND sold_at IS NOT NULL;
+    reasoning: "Calculates margin by subtracting cost from retail price. Uses sold_at IS NOT NULL to consider only items that were effectively sold."

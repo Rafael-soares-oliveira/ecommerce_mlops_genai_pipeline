@@ -1,0 +1,50 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: metrics.sales_daily
+description: "Aggregated financial and logistics metrics by day and country. Use for analyzing GMV, revenue, gross profit, and conversion/loss rates."
+rules:
+  - "Revenue: For 'actual revenue' or 'net revenue', use net_revenue. For 'transaction volume', use gmv."
+  - "Profit: Prefer gross_profit_realistic over the optimistic view, as it reflects the actual cost of returns."
+  - "Time Aggregations: For monthly or yearly views, use SUM() for financial columns (e.g., SUM(net_revenue)) while applying DATE_TRUNC to the date column. DO NOT sum rate columns (cancellation_rate), as they would need to be recalculated."
+  - "NEVER invent columns. For dates, MANDATORILY use the date column. NEVER use created_at or day."
+columns:
+  date: "DATE. Transaction date."
+  country: "TEXT. Operating country."
+  gmv: "NUMERIC. Gross Merchandise Value."
+  net_revenue: "NUMERIC. Net Revenue."
+  gross_profit_optimistic: "NUMERIC. Gross profit (Net Revenue - COGS)."
+  gross_profit_realistic: "NUMERIC. Gross profit minus estimated logistics losses (logistic_loss)."
+  logistic_loss: "NUMERIC. Estimated logistics loss cost (10% on returned items). Lower is better."
+  cancellation_rate: "NUMERIC(5,2). Percentage cancellation rate (0 to 100%)."
+  returns_rate: "NUMERIC(5,2). Percentage return rate (0 to 100%)."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "What was the total net revenue and realistic profit generated in Brazil in January 2026?"
+    sql: >
+      SELECT SUM(net_revenue) AS total_net_revenue, SUM(gross_profit_realistic) AS total_profit
+      FROM metrics.sales_daily
+      WHERE country = 'Brasil' AND day >= '2026-01-01' AND day < '2026-02-01';
+    reasoning: "Aggregates financial columns using SUM() and filters by the exact month and country."
+
+  - question: "Was there any day when the return rate exceeded 10% in the United States?"
+    sql: >
+      SELECT day, returns_rate
+      FROM metrics.sales_daily
+      WHERE country = 'United States' AND returns_rate > 10.00
+      ORDER BY returns_rate DESC;
+    reasoning: "Directly filters the return rate column, which is already pre-calculated as a percentage in the view."
+
+  - question: "Which day of the week has the highest average revenue?"
+    sql: >
+      SELECT
+        EXTRACT(ISODOW FROM date) AS day_of_week,
+        ROUND(AVG(net_revenue)::NUMERIC, 2) AS avg_revenue
+      FROM metrics.sales_daily
+      GROUP BY 1
+      ORDER BY 2 DESC
+      LIMIT 1;
+    reasoning: "Uses the date column instead of created_at. Extracts the day using ISODOW and rounds the average for clarity."

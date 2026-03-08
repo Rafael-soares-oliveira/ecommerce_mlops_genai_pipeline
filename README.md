@@ -54,7 +54,7 @@ graph LR
         end
 
         subgraph RAG_Engine ["🧠 Ollama"]
-            LLM["DeepSeek-r1:1.5b"]:::rag
+            LLM["qwen2.5-coder:3b"]:::rag
         end
 
         subgraph Postgres_Container ["🗄️ PostgreSQL 18"]
@@ -133,7 +133,7 @@ graph LR
 	* [**Sentence-Transformers**](https://huggingface.co/sentence-transformers): Uma biblioteca para gerar *embeddings* de texto de última geração, permitindo converter frases em vetores densos para busca semântica e RAG.
 		* [**all_MiniLM-L6-v2**](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2): É um modelo de *sentence embedding* extremamente leve e eficiente, ideal para converter textos em vetores densos de 384 dimensões em tarefas de busca semântica e RAG com baixo custo computacional.
 	* [**Ollama**](https://docs.ollama.com/): 
-		* [**qwen2.5-coder:1.5b**](): É um modelo de linguagem compacto e especializado em programação, treinado pela Alibaba para oferecer alta performance em geração de código e raciocínio lógico, sendo perfeito para execução local via Ollama.
+		* [**qwen2.5-coder:3b**](): É um modelo de linguagem compacto e especializado em programação, treinado pela Alibaba para oferecer alta performance em geração de código e raciocínio lógico, sendo perfeito para execução local via Ollama.
 
 <br>
 
@@ -152,6 +152,10 @@ A stack foi selecionada sob a premissa de **"foco absoluto em eficiência, baixo
 <br>
 
 ## 4. Pipeline de Dados: Passo a Passo e Decisões de Engenharia
+
+<img src="readme/kedro-pipeline.png" alt="Descrição" style="width: auto; height: auto;">
+
+<br>
 
 O projeto é dividido em dois ciclos operacionais distintos: o processamento em Batch (ETL) e a inferência em tempo real.
 
@@ -303,6 +307,88 @@ A função `create_metrics_tables` do `nodes.py` atua como um interceptador din�
 
 Todas as agregações complexas (RFM, LTV, Cohort, Funil de Conversão) são escritas inteiramente na sintaxe do Ibis (`ibis.Table`). Isso permite que as queries analíticas sejam enviadas diretamente ao PostgreSQL (*push-down*), mantendo alta performance.
 
+## 6. Arquitetura de Inferência
+
+Descreve o fluxo de execução em tempo real na interface da aplicação. O objetivo central é otimizar o tempo de resposta interceptando perguntas semanticamente similares para reaproveitar dados em memória, acionando o modelo de linguagem (SLM) e o banco de dados apenas em consultas inéditas.
+
+## 6.1. Estrutura de Contexto e Dados
+
+Para manter o máximo possível de eficiência, o banco de dados e os metadados são segmentados:
+* **Schemas do PostgreSQL**:
+	* `raw_data`: Armazena os dados brutos e já tratados pelo pipeline ETL.
+	* `metrics`: Armazena as tabelas de métricas pré-calculadas.
+	* `embeddings`: Armazena a vetorização para busca semântica (`pgvector` + `PostGIS`), como vetores de produtos e dados híbridos de usuários.
+* **Injeção de Metadados (Memória RAM)**: O RAG recupera arquivos YAML complementares do disco local contendo o contexto de negócio, esquema e *Few-Shot Examples*. Estes arquivos são vetorizados no startup da aplicação e mantidos em um Roteador Semântico em memória, garantindo recuperação instantânea (Zero-I/O no banco de dados) para guiar a geração do SQL.
+
+## 6.2. Lógica de Execução
+
+1. **Captura e Vetorização**: A interface recebe a pergunta do usuário em linguagem natural e gera seu *embedding* localmente utilizando o modelo *Sentence-Transformers*.
+2. **Estimativa de Relevância (Cache Semântico)**: Calcula-se a Similaridade de Cosseno na memória RAM entre o vetor atual e o vetor da última consulta armazenada no estado da sessão.
+	* **Cache Hit**: Se o grau de similaridade atingir ou ultrapassar o limiar de corte estabelecido (ex.: 90%), o sistema aborta a geração de uma nova query e renderiza imediatamente o DataFrame PyArrow já presente no cache.
+3. **Cache Miss (Fluxo RAG):** Se a pergunta for semanticamente diferente:
+	* O cache anterior é invalidado.
+	* O Roteador Semântico em Memória calcula a distância vetorial e recupera os arquivos YAML locais mais relevantes para o contexto da pergunta.
+	* O prompt estruturado (Pergunta + Contextos YAML) é enviado ao motor de inferência (Ollama) para a tradução *Text-to-SQL*.
+	* O Ibis recebe a query gerada e executa a extração diretamente no PostgreSQL.
+4. **Loop de Validação Automática**: Se ocorrer erro de sintaxe ou mapeamento incorreto (ex: coluna alucinada pelo SLM) durante a execução do Ibis, a exceção do banco é capturada e enviada de volta ao Ollama para correção (*Self-Correction*), protegendo a interface de quebras.
+5. **Entrega e Visualização**: Com a query validada, os resultados trafegam de volta para o Streamlit em formato binário PyArrow (Zero-Copy). O cache da sessão é atualizado com a nova pergunta e dados.
+
+## 6.3. Renderização Heurística de Gráficos
+
+Para poupar o raciocínio lógico restrito do modelo, a definição do gráfico não é responsabilidade do SLM.
+* O SLM gera apenas a consulta SQL.
+* O Streamlit analisa os tipos de dados nativos do PyArrow retornado (ex: *datetime* vs *numeric* vs *categorical*) e aplica regras determinísticas para escolher o melhor gráfico inicial (Barras, Linhas, Mapa geográfico).
+* A interface expõe a tabela de dados completa para o usuário.
+
+## 6.4 Fluxograma de Processo
+
+```mermaid
+graph LR
+	A[Usuário: Insere Nova Pergunta] --> B[Gerar Embedding da Pergunta<br/>Sentence-Transformers local]
+	B --> C{Similaridade Cosseno<br/>com Pergunta Anterior >= Limiar?}
+	
+	%% Fluxo de Cache Hit
+	C -- Sim --> D[Recuperar DataFrame PyArrow do Cache]
+	
+	%% Fluxo de Cache Miss / RAG
+	C -- Não --> F[Limpar Cache Anterior]
+	F --> G[Recuperar Contexto YAML Local<br/>Roteador Semântico em Memória]
+	G --> H[Enviar Prompt ao Ollama<br/>qwen2.5-coder:3b]
+	H --> I[Gerar Query SQL dialecto Postgres]
+	I --> J[Ibis: Validar e Executar Query]
+	
+	%% Loop de Autocorreção e Retorno
+	J -- Falha Sintaxe / Regra --> H
+	J -- Execução Bem-sucedida --> K[Retornar Tabela Formato PyArrow]
+	K --> L[Atualizar Cache de Sessão<br/>Vetor Atual + PyArrow]
+	L --> D
+	
+	%% Interface e Gráficos
+	D --> M[Streamlit analisa dtypes PyArrow<br/>Aplica Heurística de Gráfico]
+	M --> E[Renderizar UI: Gráfico e Tabela]
+```
+
+## 6.5. Detalhamento dos Módulos Python (Camada de Inferência)
+
+O motor de RAG e a interface gráfica foram desacoplados e organizados para maximizar a testabilidade, eficiência e segurança do processamento de dados:
+
+- `factory.py` (**Gerenciador de Conexões e Cache**): Implementa o padrão Singleton (`DatabasePool`) para manter uma conexão Ibis/PostgreSQL persistente e eficiente. Centraliza a inicialização do Roteador Semântico e as configurações globais de TTL (Time-To-Live) para os caches da aplicação.
+- `llm_service.py` (**Orquestrador Text-to-SQL**): Abstrai a comunicação com a API REST do Ollama. Executa traduções, extrai rigorosamente o código SQL via expressões regulares (descartando alucinações verbais) e orquestra o fluxo de _Self-Correction_. Utiliza a biblioteca `tenacity` para garantir resiliência (retries e timeouts) nas requisições.
+- `semantic_cache.py` (**Cache Semântico de Sessão**): Implementa a interceptação de requisições calculando a Similaridade de Cosseno entre a pergunta atual e o histórico. Em caso de _hit_ (ex: similaridade ≥0.95), retorna instantaneamente o `DataFrame` PyArrow armazenado na RAM, poupando recursos do LLM e do banco de dados.
+- `semantic_router.py` (**Roteador Semântico Zero-I/O**): Lê e vetoriza os arquivos YAML de contexto usando `SentenceTransformer` durante o _startup_. Utiliza operações vetorizadas com `numpy` para encontrar os esquemas mais relevantes em frações de segundo, injetando apenas o contexto estritamente necessário no prompt para preservar a janela de tokens.
+- `sql_executor.py` (**Validador de AST e Executor Ibis**): Atua como a principal barreira de segurança de execução. Faz o _parse_ da Árvore de Sintaxe Abstrata (AST) do SQL gerado utilizando `sqlglot` para garantir que apenas comandos de leitura (SELECT) passem. Executa a query via `PostgresBackend` do Ibis e retorna os dados nativamente em formato binário _Zero-Copy_ (`.to_pyarrow()`).
+
+<hr>
+
+<img src="readme/execute_summary.gif" width="600"/>
+
+<br>
+
+<img src="readme/streamlit_metrics.png" width="600" />
+
+<img src="readme/chatbot.gif" width="600" />
+
+
 ## Estrutura do Repositório
 
 ``` plaintext
@@ -339,17 +425,32 @@ Todas as agregações complexas (RFM, LTV, Cohort, Funil de Conversão) são esc
 │   └── raw_data/                 # Scripts para criação e indexação de tabelas pós-tratamento
 │
 ├── src/
-│   └── thelook_ecommerce_analysis/
-│       ├── datasets/             # Implementação de datasets customizados
-│       ├── hooks.py              # Hooks de execução do Kedro
-│       ├── pipeline_registry.py  # Registro central dos pipelines disponíveis
-│       ├── settings.py           # Configurações globais de execução do Kedro
-│       ├── utils/                # Funções utilitárias
-│       └── pipelines             # Pipelines de dados
-│           ├── data_processing   # Extração, transformação e carga inicial
-│           ├── data_embeddings   # Criação de tabelas de vetores para auxílio do RAG
-│           └── data_metrics      # Agregação e consolidação de métricas de negócio
-│
+│   ├── thelook_ecommerce_analysis/
+│   │   ├── datasets/             # Implementação de datasets customizados
+│   │   ├── hooks.py              # Hooks de execução do Kedro
+│   │   ├── pipeline_registry.py  # Registro central dos pipelines disponíveis
+│   │   ├── settings.py           # Configurações globais de execução do Kedro
+│   │   ├── utils/                # Funções utilitárias
+│   │   └── pipelines             # Pipelines de dados
+│   │       ├── data_processing   # Extração, transformação e carga inicial
+│   │       ├── data_embeddings   # Criação de tabelas de vetores para auxílio do RAG
+│   │       └── data_metrics      # Agregação e consolidação de métricas de negócio
+│   │
+│   ├── rag_config/               # Configurações da lógica do RAG
+│   │   ├── context_yamls/        # Contextos das tabelas
+│   │   ├── factory.py            # Gerenciador de Conexões e Cache
+│   │   ├── llm_service.py        # Orquestrador Text-to-SQL
+│   │   ├── semantic_cache.py     # Cache Semântico de Sessão
+│   │   ├── semantic_router.py    # Roteador Semânticos Zero-I/O
+│   │   └── sql_executor.py       # Validador de AST e Executor Ibis
+│   │
+│   ├── streamlit_view/           # Construção do Streamlit
+│   │   ├── analyst_chat.py       # Página do chatbot RAG
+│   │   ├── executive_summary.py  # Página para gerar resumo executivo
+│   │   └── metrics_dashboard.py  # Página de gráficos e KPIs
+│   │
+│   └── app.py                    # Arquivo principal do Streamlit
+│   
 ├── tests/                        # Testes unitários espelhando a estrutura do src/
 │   ├── datasets/                 # Testes dos custom datasets
 │   ├── kedro_settings            # Testes das configurações do Kedro
@@ -433,15 +534,17 @@ Este planejamento foca nas entregas lógicas, sem datas fixas.
   - [X] Node para criar tabelas de métricas
   - [X] Criar testes com pelo menos 90% coverage
   - [X] Documentar no README.md
-- [ ] Implementar **Pipeline de SLM Batch**:
-  - [ ] Configurar modelo e contexto
-  - [ ] Node que agrega métricas diárias.
-  - [ ] Integração com API do Ollama para gerar resumos textuais.
 
 ### Fase 4: Consumo e Visualização
 
-- [ ] Configurar RAG.
-- [ ] Configurar Streamlit.
-- [ ] Cria dashboard modelo no Streamlit.
-- [ ] Criar Dashboard no Streamlit.
-- [ ] Implementar Chatbot RAG no Streamlit.
+- [X] Configurar RAG.
+- [X] Configurar Streamlit.
+- [X] Cria dashboard modelo no Streamlit.
+- [X] Criar Dashboard no Streamlit.
+- [X] Implementar Chatbot RAG no Streamlit.
+
+### Fase 5: Melhoria Contínua
+
+- [ ] Melhorar visual do dashboard
+- [ ] Criar dashboard de geolocalização
+- [ ] Melhorar lógica do RAG

@@ -1,0 +1,27 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: metrics.cohort_retention
+description: "Analytical table for cohort retention segmented by country."
+rules:
+  - "Month Zero: `month_number = 0` always represents 100% retention, as it is the month of the first purchase."
+  - "Evolution: To analyze a cohort's retention curve, filter by `cohort_month` and order by `month_number`."
+columns:
+  country: "TEXT. User's country of origin for the cohort."
+  cohort_month: "DATE. Starting month (first purchase) of the group."
+  original_users: "INTEGER. Original cohort size at month 0."
+  month_number: "INTEGER. Months elapsed since the first purchase (0 to 12)."
+  active_users: "INTEGER. Cohort users who made a purchase in this specific month."
+  retention_rate: "NUMERIC. Retention rate as a percentage (e.g., 25.50)."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "What was the retention rate in the third month (month 3) for the January 2026 cohort in Brazil?"
+    sql: >
+      SELECT retention_rate FROM metrics.cohort_retention
+      WHERE country = 'Brazil'
+        AND cohort_month = '2026-01-01'
+        AND month_number = 3;
+    reasoning: "Filter by country,exact cohort start month, and the specific evolution month (3)."

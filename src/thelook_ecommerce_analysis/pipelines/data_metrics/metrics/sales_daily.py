@@ -12,7 +12,7 @@ def daily_sales_and_revenue(
 ) -> ibis.Table:
     """
     Calculates financial metrics:
-        - Day
+        - Date
         - GMV
         - Net Revenue
         - Gross Profit Optimistic
@@ -25,7 +25,7 @@ def daily_sales_and_revenue(
         >>>
         with metrics as (
             select
-                cast(date_trunc('day', oi.created_at) as date) as day,
+                cast(date_trunc('day', oi.created_at) as date) as date,
                 u.country,
                 coalesce(sum(oi.sale_price) filter (where oi.status != 'Cancelled'), 0) as gmv,
                 coalesce(sum(oi.sale_price) filter (where oi.status not in ('Cancelled', 'Returned')), 0) as net_revenue,
@@ -43,7 +43,7 @@ def daily_sales_and_revenue(
         ),
         final_metrics as (
             select
-                day,
+                date,
                 country,
                 gmv,
                 net_revenue,
@@ -63,7 +63,7 @@ def daily_sales_and_revenue(
             from metrics
         )
         select
-            day,
+            date,
             country
             gmv,
             net_revenue,
@@ -92,7 +92,8 @@ def daily_sales_and_revenue(
 
     # 4. Agregações
     daily_aggregated = joined.group_by(
-        day=joined["created_at"].truncate("D").cast("date"), country=joined["u_country"]
+        date=joined["created_at"].truncate("D").cast("date"),
+        country=joined["u_country"],
     ).aggregate(
         # GMV
         gmv=joined["sale_price"].sum(where=~is_cancelled).fill_null(0),
@@ -143,7 +144,7 @@ def daily_sales_and_revenue(
         )
         # Projeção Final
         .select(
-            "day",
+            "date",
             "country",
             "gmv",
             "net_revenue",
@@ -154,7 +155,7 @@ def daily_sales_and_revenue(
             "cancellation_rate",
             "returns_rate",
         )
-        .order_by(_.day.desc())
+        .order_by(_.date.desc())
     )
 
     return final_view

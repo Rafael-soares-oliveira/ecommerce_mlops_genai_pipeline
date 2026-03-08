@@ -1,0 +1,24 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: embeddings.fct_user_logistics
+description: "Pre-calculated table containing distances between users and distribution centers based on actual purchases."
+rules:
+  - "Distance Shortcut: To determine the distance from a user to a DC, use the distance_km column in this table. Avoid using ST_Distance with multiple JOINs on raw tables."
+columns:
+  user_id: "INT. User foreign key."
+  dc_id: "INT. Distribution center foreign key."
+  distance_km: "NUMERIC. Pre-calculated distance in kilometers."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "What is the average distance from distribution centers to the users they serve?"
+    sql: >
+      SELECT
+        dc_id,
+        AVG(distance_km) as avg_distance_km
+      FROM embeddings.fct_user_logistics
+      GROUP BY dc_id;
+    reasoning: "Avoids on-the-fly ST_Distance calculations by leveraging the pre-calculated logistics table in km."

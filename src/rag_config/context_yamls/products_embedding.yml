@@ -1,0 +1,24 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: embeddings.products_embeddings
+description: "Semantic search table for products using vectors (pgvector)."
+rules:
+  - "Vector Search: For semantic ordering, MANDATORILY use the cosine operator (<=>) with a placeholder. Example: `ORDER BY embedding <=> $<generated_vector>`."
+  - "Hybrid Search: Always apply metadata filters (`brand`, `category`, `department`, `retail_price`) in the WHERE clause before vector ordering to optimize performance."
+columns:
+  source_id: "BIGINT. FK to `raw_data.products(id)`."
+  chunk_text: "TEXT. The product text. Return this column in the `SELECT` statement for RAG (Retrieval-Augmented Generation)."
+  brand: "TEXT. Product brand."
+  category: "TEXT. Product category."
+  department: "TEXT. Product department."
+  retail_price: "DOUBLE PRECISION. Product retail price."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "Find the 3 'Jeans' products most semantically similar to the user's description."
+    sql: >
+      SELECT source_id, chunk_text, retail_price FROM embeddings.products_embeddings WHERE category = 'Jeans' ORDER BY embedding <=> $<vetor_gerado> LIMIT 3;
+    reasoning: "Applies the category filter via B-Tree (WHERE) and then orders by vector similarity via HNSW using the cosine operator and placeholder."

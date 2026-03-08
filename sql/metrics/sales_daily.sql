@@ -1,7 +1,7 @@
 /*
 WITH metrics AS (
 	SELECT
-		CAST(DATE_TRUNC('day', oi.created_at) AS date) as day,
+		CAST(DATE_TRUNC('day', oi.created_at) AS date) as date,
 		u.country,
 		COALESCE(SUM(oi.sale_price) FILTER (WHERE oi.status != 'Cancelled'), 0) AS gmv,
 		COALESCE(SUM(oi.sale_price) FILTER (WHERE oi.status NOT IN ('Cancelled', 'Returned')), 0) AS net_revenue,
@@ -19,7 +19,7 @@ WITH metrics AS (
 ),
 final_metrics AS (
 	SELECT
-		day,
+		date,
 		country,
 		gmv,
 		net_revenue,
@@ -39,7 +39,7 @@ final_metrics AS (
 	FROM metrics
 )
 SELECT
-	day,
+	date,
 	country
 	gmv,
 	net_revenue,

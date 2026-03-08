@@ -69,7 +69,7 @@ def customer_rfm_ltv(users: ibis.Table, order_items: ibis.Table) -> ibis.Table:
         .aggregate(
             recency_days=(snapshot_date - valid_items.created_at.max().cast("date")),
             frequency_count=valid_items.order_id.nunique(),
-            ltv=valid_items.sale_price.sum(),
+            ltv_value=valid_items.sale_price.sum(),
             first_purchase_date=valid_items.created_at.min().cast("date"),
         )
     )
@@ -78,7 +78,7 @@ def customer_rfm_ltv(users: ibis.Table, order_items: ibis.Table) -> ibis.Table:
     rfm_scores = customer_stats.mutate(
         r_score=ibis.ntile(5).over(order_by=ibis.desc("recency_days")),
         f_score=ibis.ntile(5).over(order_by="frequency_count"),
-        m_score=ibis.ntile(5).over(order_by="ltv"),
+        m_score=ibis.ntile(5).over(order_by="ltv_value"),
     )
 
     # 4. Segmentação e Projeção Final
@@ -94,13 +94,23 @@ def customer_rfm_ltv(users: ibis.Table, order_items: ibis.Table) -> ibis.Table:
                 else_="General",
             )
         ),
-        ltv_value=_.ltv.round(2),
+        ltv_value=_.ltv_value.round(2),
         rfm_score=_.r_score.cast("string")
         + _.f_score.cast("string")
         + _.m_score.cast("string"),
-    ).order_by(_.ltv.desc())
+    ).order_by(_.ltv_value.desc())
 
-    return final_df
+    return final_df.select(
+        user_id="id",
+        recency_days="recency_days",
+        frequency_count="frequency_count",
+        ltv_value="ltv_value",
+        rfm_score="rfm_score",
+        r_score="r_score",
+        f_score="f_score",
+        m_score="m_score",
+        customer_segment="customer_segment",
+    )
 
 
 def cohort_retention(

@@ -1,0 +1,37 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: raw_data.distribution_centers
+description: "Physical locations of distribution centers. Use for logistics, routing, and distance calculations."
+rules:
+  - "Do not perform direct mathematical calculations with latitude and longitude. For any spatial distance calculation, it is mandatory to use the `distribution_center_geom` colum with PostGIS functions (e.g., ST_Distance)."
+  - "The `name` columns has case-insensitive collation. Do not apply `LOWER()` or `UPPER()`."
+columns:
+  id: "INTEGER. Primary key."
+  name: "TEXT. Unique name of the distribution center."
+  latitude: "DOUBLE PRECISION. Y axis (-90 a 90)."
+  longitude: "DOUBLE PRECISION. X axis (-180 a 180)."
+  distribution_center_geom: "GEOGRAPHY(POINT, 4326). Generated column for PostGIS spatial operations."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "What are the latitude and longitude of the 'SP-Central' distribution center?"
+    sql: >
+      SELECT latitude, longitude FROM raw_data.distribution_centers
+      WHERE name = 'SP-Central';
+    reasoning: "Direct search by the `name` column without using `LOWER()`, as it already has case-insensitive collation."
+
+  - question: "List the distribution centers within a 50km radius of the coordinate (latitude -22.9, longitude -43.2)."
+    sql: >
+      SELECT name FROM raw_data.distribution_centers
+      WHERE ST_DWithin(distribution_center_geom, ST_SetSRID(ST_MakePoint(-43.2, -22.9), 4326)::geography, 50000);
+    reasoning: "Uses ST_DWithin with the `distribution_center_geom` column. The 50km distance is converted to 50,000 meters. ST_MakePoint takes longitude first, then latitude."
+
+  - question: "What is the distance in kilometers between the 'SP-Central' and 'RJ-Main' distribution centers?"
+    sql: >
+      SELECT ST_Distance(a.distribution_center_geom, b.distribution_center_geom) / 1000 AS distance_km
+      FROM raw_data.distribution_centers a, raw_data.distribution_centers b
+      WHERE a.name = 'SP-Central' AND b.name = 'RJ-Main';
+    reasoning: "Uses ST_Distance on the geography columns to get the shortest distance in meters, then divides by 1000 for kilometers."

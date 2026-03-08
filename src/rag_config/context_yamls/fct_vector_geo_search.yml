@@ -1,0 +1,30 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: embeddings.fct_vector_geo_search
+description: "Table for complex hybrid search combining semantics (vectors), geolocation (PostGIS), and business filters."
+rules:
+  - "Hybrid Search: Use `ST_DWithin(user_geom, ...)` in the WHERE clause to restrict the area before ordering by vector similarity (`ORDER BY embedding <=> $<generated_vector>`)."
+columns:
+  user_id: "INT. FK to raw_data.users(id)."
+  avg_spend: "DOUBLE PRECISION. Average user spend (ideal for filters like 'top spenders')."
+  chunk_text: "TEXT. Profile summary. Return this for RAG (Retrieval-Augmented Generation)."
+  user_geom: "GEOGRAPHY(POINT). Spatial coordinate."
+
+# =======================
+# FEW-SHOT
+# =======================
+few_shot_examples:
+  - question: "Find the most relevant profiles (semantic search) living in São Paulo within a 10km radius of the coordinate (-23.5, -46.6)."
+    sql: >
+      SELECT
+        user_id,
+        chunk_text,
+        avg_spend
+      FROM embeddings.fct_vector_geo_search
+      WHERE
+        city = 'São Paulo' AND
+        ST_DWithin(user_geom, ST_SetSRID(ST_MakePoint(-46.6, -23.5), 4326)::geography, 10000)
+      ORDER BY embedding <=> $<vetor_gerado>
+      LIMIT 5;
+    reasoning: "Une filtros exatos (cidade), filtro espacial em metros (ST_DWithin) e ordenação semântica (HNSW)."

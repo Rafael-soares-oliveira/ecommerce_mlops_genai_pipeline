@@ -1,0 +1,19 @@
+# =======================
+# CONTEXT
+# =======================
+table_name: embeddings.map_hotspots_h3
+description: "User heatmaps (hotspots). Materialized and optimized view grouping users into 5.5km grids."
+rules:
+  - "Analytical Shortcut: NEVER perform spatial GROUP BY on the users table if the question is about density or concentration. Use this table directly."
+columns:
+  grid_geom: "GEOGRAPHY. Center point of the 5.5km quadrant."
+  density: "BIGINT. Number of users concentrated at that point."
+  avg_user_age: "INTEGER. Average age in the region."
+
+# =======================
+# FEW-SHOT
+# =======================
+question: "What are the top 5 areas with the highest user concentration (hotspots)?"
+sql: >
+  SELECT ST_Y(grid_geom::geometry) AS lat, ST_X(grid_geom::geometry) AS lon, density FROM embeddings.map_hotspots_h3 ORDER BY density DESC LIMIT 5;
+reasoning: "Uses the aggregated hotspots table, extracting latitude and longitude from the center point and ordering by density in descending order."

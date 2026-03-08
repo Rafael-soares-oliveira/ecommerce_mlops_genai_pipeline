@@ -23,4 +23,4 @@ metrics:
   returns_cost: 0.10 # 10% do custo da logística reversa em caso de devolução
   cohort_limit: 12 # 12 meses
 
-rag_model: ${oc.env:OLLAMA_MODEL, "qwen2.5-coder:1.5b"}
+rag_model: ${oc.env:OLLAMA_MODEL, "qwen2.5-coder:3b"}

@@ -11,8 +11,11 @@ WORKDIR /app
 
 # 1. Instala dependências de sistema essenciais
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev curl && \
-    rm -rf /var/lib/apt/lists/*
+    build-essential \
+    libpq-dev \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # 2. Copia apenas os arquivos de definição
 COPY pyproject.toml uv.lock README.md ./
@@ -23,14 +26,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # 4. Cache do Modelo
 ARG EMBEDDING_MODEL_NAME
-RUN uv run python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${EMBEDDING_MODEL_NAME}')"
+RUN uv run python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${EMBEDDING_MODEL_NAME}')" \
+    && rm -rf /root/.cache/pip/* /root/.cache/huggingface/*
 
 # 5. Copia o restante do código
 COPY . .
 
 # 6. Sincronização final do projeto
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --group heavy
+    uv sync --frozen --no-dev --group heavy \
+    && rm -rf /root/.cache/pip/* /root/.cache/huggingface/*
 
 # Expor a porta padrão do Streamlit
 EXPOSE 8501
